@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { TextInput, View, type TextInputProps, type ViewStyle } from 'react-native';
+import { TextInput, View, type TextInputProps, type TextStyle, type ViewStyle } from 'react-native';
 
 import { useTheme } from '@/hooks';
 
@@ -18,6 +18,8 @@ export type InputProps = Omit<TextInputProps, 'style'> & {
   /** Grows to fill the parent — used by the translate composer. */
   fill?: boolean;
   containerStyle?: ViewStyle;
+  /** Overrides on the field itself, e.g. a taller `minHeight`. */
+  inputStyle?: TextStyle;
 };
 
 export function Input({
@@ -27,6 +29,7 @@ export function Input({
   variant = 'default',
   fill = false,
   containerStyle,
+  inputStyle,
   multiline,
   onFocus,
   onBlur,
@@ -83,6 +86,7 @@ export function Input({
             paddingHorizontal: theme.spacing.base,
             paddingVertical: theme.spacing.md,
           },
+          inputStyle,
         ]}
         {...rest}
       />

@@ -3,8 +3,13 @@ import type { LanguageCode } from './language';
 /** Where a piece of text came from. Drives history icons and analytics. */
 export type TranslationSource = 'text' | 'camera' | 'voice' | 'clipboard';
 
-/** Which engine produced a result. Surfaced to the user as an "Offline" badge. */
-export type TranslationEngine = 'online' | 'offline';
+/**
+ * Which engine produced a result. Surfaced to the user as a badge.
+ *
+ * `mock` is the temporary in-memory engine used while no real engine exists;
+ * it is removed together with `FEATURES.mockTranslation`.
+ */
+export type TranslationEngine = 'online' | 'offline' | 'mock';
 
 export type TranslationRequest = {
   text: string;

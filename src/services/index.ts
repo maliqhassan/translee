@@ -1,3 +1,4 @@
+export * from './clipboard';
 export * from './language-packs';
 export * from './ocr';
 export * from './service-registry';

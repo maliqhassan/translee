@@ -11,12 +11,16 @@ export const STORAGE_KEYS = {
 } as const;
 
 export const DEFAULTS = {
-  sourceLanguage: 'auto',
-  targetLanguage: 'es',
-  /** Debounce before an as-you-type translation would be requested (Day 2+). */
+  sourceLanguage: 'en',
+  targetLanguage: 'de',
+  /** Debounce before an as-you-type translation would be requested. */
   translateDebounceMs: 450,
   maxInputLength: 5000,
+  /** Point at which the character counter starts warning, as a ratio. */
+  inputWarningRatio: 0.9,
   historyPageSize: 30,
+  /** Recent translations surfaced on the home screen. */
+  recentOnHome: 3,
 } as const;
 
 /**
@@ -24,6 +28,11 @@ export const DEFAULTS = {
  * half-built features off the UI without branching the codebase.
  */
 export const FEATURES = {
+  /**
+   * Routes every translation to the in-memory sample engine. Turn off in the
+   * same change that registers a real engine in the service registry.
+   */
+  mockTranslation: true,
   offlineTranslation: false,
   cameraOcr: false,
   speechInput: false,

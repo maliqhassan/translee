@@ -47,3 +47,16 @@ written once and is correct in both.
 - Every interactive element carries an accessibility role and label.
 - Loading and empty are first-class states, not afterthoughts. A screen with no
   data should still look finished.
+
+## Screen slots
+
+`Screen` carries the props that every route would otherwise reinvent:
+
+- `header` -- pinned above the scroll area, so a title stays put
+- `scrollable` -- wraps content in a ScrollView with the standard gutter and gap
+- `keyboardAvoiding` -- enable on any screen with a text input
+- `edgeToEdge`, `edges`, `contentStyle`
+
+`ScreenHeader` takes `leading` (a brand mark or back affordance), `actions` and
+`compact`. `Input` takes `inputStyle` for one-off field sizing, and `variant`
+`bare` when it sits inside an existing surface.

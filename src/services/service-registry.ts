@@ -1,7 +1,25 @@
+import { FEATURES } from '@/constants';
+
+import { expoClipboardService } from './clipboard';
 import { languagePackManager } from './language-packs';
 import { ocrService } from './ocr';
 import { speechService, ttsService } from './speech';
-import { offlineTranslationService, onlineTranslationService } from './translation';
+import {
+  createTranslationRouter,
+  mockTranslationService,
+  offlineTranslationService,
+  onlineTranslationService,
+  type TranslationService,
+} from './translation';
+
+/**
+ * Routing policy, expressed as an ordered candidate list. While
+ * `FEATURES.mockTranslation` is on, the sample engine is the only candidate;
+ * turning the flag off restores the real online-then-offline order.
+ */
+const translationEngines: readonly TranslationService[] = FEATURES.mockTranslation
+  ? [mockTranslationService]
+  : [onlineTranslationService, offlineTranslationService];
 
 /**
  * Single place where concrete services are bound to their interfaces.
@@ -12,9 +30,12 @@ import { offlineTranslationService, onlineTranslationService } from './translati
  */
 export const services = {
   translation: {
+    /** What the UI calls. It never picks an engine itself. */
+    router: createTranslationRouter(translationEngines),
     online: onlineTranslationService,
     offline: offlineTranslationService,
   },
+  clipboard: expoClipboardService,
   ocr: ocrService,
   speech: speechService,
   tts: ttsService,

@@ -32,6 +32,27 @@ app -> features -> components / services / store / database -> hooks / utils / c
 one exception is a type-only import of a service model, e.g. `LanguagePack`).
 `src/constants`, `src/utils` and `src/types` import nothing from the app.
 
+One feature may use another through its **public barrel only**
+(`@/features/history`), never by reaching into its internals. The translate
+screen composing `RecentTranslations` is the intended shape: the history
+feature owns that data and its presentation, and home just places it.
+
+## The translation path
+
+The UI never selects an engine:
+
+```
+TranslateScreen -> useTranslation -> services.translation.router
+                                       -> mock | online | offline engine
+```
+
+`createTranslationRouter` takes an ordered candidate list and picks the first
+engine that is both available and supports the requested pair. That list is
+built in `service-registry.ts`, which makes routing policy a one-line change:
+adding connectivity checks or an offline-first preference never touches a
+screen. `TranslationRouter` is what features depend on; `TranslationService`
+is what engines implement.
+
 ## Why routes are one-liners
 
 `app/(tabs)/index.tsx` is a single re-export. Routing then stays a map of URLs

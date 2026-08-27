@@ -2,6 +2,7 @@ export * from './colors';
 export * from './config';
 export * from './languages';
 export * from './layout';
+export * from './messages';
 export * from './palette';
 export * from './radius';
 export * from './shadows';
