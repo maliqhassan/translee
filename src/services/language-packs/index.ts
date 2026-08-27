@@ -2,6 +2,7 @@ import { err, notImplemented } from '@/utils';
 
 import type { LanguagePackManager } from './language-pack-manager';
 
+export * from './language-availability';
 export * from './language-pack-manager';
 
 const noop = () => {};

@@ -1,42 +1,69 @@
-import type { Language, LanguageCode } from '@/types';
+import type { Language, LanguageId } from '@/types';
+import { foldForSearch } from '@/utils';
+
+import { AUTO_DETECT, AUTO_DETECT_ID, LANGUAGE_CATALOG } from './language-catalog';
+
+export { AUTO_DETECT, AUTO_DETECT_ID, LANGUAGE_CATALOG } from './language-catalog';
 
 /**
- * Reference data for the languages the product intends to support. Availability
- * of an *offline pack* per language is runtime state and lives in the offline
- * feature — this list is static metadata only.
+ * Selectors over the catalogue. Every component reads languages through this
+ * module, so display names, codes and offline metadata have exactly one source.
  */
-export const LANGUAGES: readonly Language[] = [
-  { code: 'auto', name: 'Detect language', nativeName: 'Detect language', direction: 'ltr' },
-  { code: 'ar', name: 'Arabic', nativeName: 'العربية', direction: 'rtl' },
-  { code: 'bn', name: 'Bengali', nativeName: 'বাংলা', direction: 'ltr' },
-  { code: 'de', name: 'German', nativeName: 'Deutsch', direction: 'ltr' },
-  { code: 'en', name: 'English', nativeName: 'English', direction: 'ltr' },
-  { code: 'es', name: 'Spanish', nativeName: 'Español', direction: 'ltr' },
-  { code: 'fa', name: 'Persian', nativeName: 'فارسی', direction: 'rtl' },
-  { code: 'fr', name: 'French', nativeName: 'Français', direction: 'ltr' },
-  { code: 'hi', name: 'Hindi', nativeName: 'हिन्दी', direction: 'ltr' },
-  { code: 'id', name: 'Indonesian', nativeName: 'Bahasa Indonesia', direction: 'ltr' },
-  { code: 'it', name: 'Italian', nativeName: 'Italiano', direction: 'ltr' },
-  { code: 'ja', name: 'Japanese', nativeName: '日本語', direction: 'ltr' },
-  { code: 'ko', name: 'Korean', nativeName: '한국어', direction: 'ltr' },
-  { code: 'nl', name: 'Dutch', nativeName: 'Nederlands', direction: 'ltr' },
-  { code: 'pl', name: 'Polish', nativeName: 'Polski', direction: 'ltr' },
-  { code: 'pt', name: 'Portuguese', nativeName: 'Português', direction: 'ltr' },
-  { code: 'ru', name: 'Russian', nativeName: 'Русский', direction: 'ltr' },
-  { code: 'th', name: 'Thai', nativeName: 'ไทย', direction: 'ltr' },
-  { code: 'tr', name: 'Turkish', nativeName: 'Türkçe', direction: 'ltr' },
-  { code: 'ur', name: 'Urdu', nativeName: 'اردو', direction: 'rtl' },
-  { code: 'vi', name: 'Vietnamese', nativeName: 'Tiếng Việt', direction: 'ltr' },
-  { code: 'zh', name: 'Chinese (Simplified)', nativeName: '简体中文', direction: 'ltr' },
-];
 
-const BY_CODE = new Map<LanguageCode, Language>(LANGUAGES.map((lang) => [lang.code, lang]));
+/** All real languages. `auto` is not one of them. */
+export const LANGUAGES: readonly Language[] = LANGUAGE_CATALOG;
 
-export function getLanguage(code: LanguageCode): Language | undefined {
-  return BY_CODE.get(code);
+/** Valid as a translation source, including the detect sentinel. */
+export const SOURCE_LANGUAGES: readonly Language[] = [AUTO_DETECT, ...LANGUAGE_CATALOG];
+
+/** Valid as a translation target. Detection is meaningless here. */
+export const TARGET_LANGUAGES: readonly Language[] = LANGUAGE_CATALOG;
+
+/** The shortlist offered above the full list. */
+export const POPULAR_LANGUAGES: readonly Language[] = LANGUAGE_CATALOG.filter(
+  (language) => language.isPopular,
+);
+
+const BY_ID = new Map<LanguageId, Language>([
+  [AUTO_DETECT_ID, AUTO_DETECT],
+  ...LANGUAGE_CATALOG.map((language): [LanguageId, Language] => [language.id, language]),
+]);
+
+export function getLanguage(id: LanguageId): Language | undefined {
+  return BY_ID.get(id);
 }
 
-/** Languages that can be a translation *target* (i.e. everything but `auto`). */
-export const TARGET_LANGUAGES: readonly Language[] = LANGUAGES.filter(
-  (lang) => lang.code !== 'auto',
+/** Display name, falling back to the raw id so the UI never renders blank. */
+export function languageName(id: LanguageId): string {
+  return BY_ID.get(id)?.name ?? id;
+}
+
+/** Short badge text, e.g. `EN`, `ZH-HANS`. */
+export function languageShortCode(id: LanguageId): string {
+  return id.toUpperCase();
+}
+
+export function isAutoDetect(id: LanguageId): boolean {
+  return id === AUTO_DETECT_ID;
+}
+
+/**
+ * Precomputed haystacks so filtering never re-folds the catalogue. Built once
+ * at module load; the catalogue is static.
+ */
+const SEARCH_INDEX = new Map<LanguageId, string>(
+  SOURCE_LANGUAGES.map((language): [LanguageId, string] => [
+    language.id,
+    foldForSearch(`${language.name} ${language.nativeName} ${language.code} ${language.id}`),
+  ]),
 );
+
+/**
+ * Filters a pool by name, native name, ISO code or id. Accent-insensitive, so
+ * "espanol" finds "Español". An empty query returns the pool untouched.
+ */
+export function searchLanguages(pool: readonly Language[], query: string): readonly Language[] {
+  const needle = foldForSearch(query);
+  if (!needle) return pool;
+  return pool.filter((language) => SEARCH_INDEX.get(language.id)?.includes(needle) ?? false);
+}

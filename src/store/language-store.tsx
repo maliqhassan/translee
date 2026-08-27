@@ -1,58 +1,99 @@
 import { createContext, useContext, useMemo, useReducer, type ReactNode } from 'react';
 
 import { DEFAULTS } from '@/constants';
-import type { LanguageCode, LanguagePair } from '@/types';
+import type { LanguageId, LanguagePair } from '@/types';
 
-type Action =
-  | { type: 'setSource'; code: LanguageCode }
-  | { type: 'setTarget'; code: LanguageCode }
-  | { type: 'swap' };
+import { applySource, applySwap, applyTarget, canSwap, remember } from './language-pair-rules';
 
-const INITIAL: LanguagePair = {
-  source: DEFAULTS.sourceLanguage,
-  target: DEFAULTS.targetLanguage,
+export type LanguageField = 'source' | 'target';
+
+type State = {
+  pair: LanguagePair;
+  /** Most recently chosen first. Excludes the detect sentinel. */
+  recentSource: readonly LanguageId[];
+  recentTarget: readonly LanguageId[];
 };
 
-function reducer(state: LanguagePair, action: Action): LanguagePair {
+type Action =
+  { type: 'setSource'; id: LanguageId } | { type: 'setTarget'; id: LanguageId } | { type: 'swap' };
+
+const INITIAL: State = {
+  pair: { source: DEFAULTS.sourceLanguage, target: DEFAULTS.targetLanguage },
+  recentSource: [],
+  recentTarget: [],
+};
+
+function reducer(state: State, action: Action): State {
+  const { pair } = state;
+
   switch (action.type) {
-    case 'setSource':
-      return action.code === state.target
-        ? { source: action.code, target: state.source }
-        : { ...state, source: action.code };
-    case 'setTarget':
-      return action.code === state.source
-        ? { source: state.target, target: action.code }
-        : { ...state, target: action.code };
+    case 'setSource': {
+      const next = applySource(pair, action.id);
+      return {
+        pair: next,
+        recentSource: remember(state.recentSource, action.id),
+        // A swap also moved the other side, so record what landed there.
+        recentTarget:
+          next.target === pair.source
+            ? remember(state.recentTarget, next.target)
+            : state.recentTarget,
+      };
+    }
+
+    case 'setTarget': {
+      const next = applyTarget(pair, action.id);
+      return {
+        pair: next,
+        recentSource:
+          next.source === pair.target
+            ? remember(state.recentSource, next.source)
+            : state.recentSource,
+        recentTarget: remember(state.recentTarget, action.id),
+      };
+    }
+
     case 'swap':
-      // `auto` can never become a target, so swapping is a no-op in that case.
-      return state.source === 'auto' ? state : { source: state.target, target: state.source };
+      return { ...state, pair: applySwap(pair) };
   }
 }
 
 type LanguageContextValue = {
   pair: LanguagePair;
   canSwap: boolean;
-  setSource: (code: LanguageCode) => void;
-  setTarget: (code: LanguageCode) => void;
+  recent: { source: readonly LanguageId[]; target: readonly LanguageId[] };
+  setSource: (id: LanguageId) => void;
+  setTarget: (id: LanguageId) => void;
+  /** Writes whichever side the picker was opened for. */
+  select: (field: LanguageField, id: LanguageId) => void;
   swap: () => void;
 };
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
 
-/** Holds the source/target pair shared by the translate, camera and voice flows. */
+/**
+ * Holds the source/target pair shared by the translate, camera and voice flows,
+ * plus the recently chosen languages per side.
+ *
+ * Recents are in memory only. They move to `STORAGE_KEYS.languageSelection` on
+ * the persistence day; the shape here is already what that will hydrate.
+ */
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [pair, dispatch] = useReducer(reducer, INITIAL);
+  const [state, dispatch] = useReducer(reducer, INITIAL);
 
-  const value = useMemo<LanguageContextValue>(
-    () => ({
-      pair,
-      canSwap: pair.source !== 'auto',
-      setSource: (code) => dispatch({ type: 'setSource', code }),
-      setTarget: (code) => dispatch({ type: 'setTarget', code }),
+  const value = useMemo<LanguageContextValue>(() => {
+    const setSource = (id: LanguageId) => dispatch({ type: 'setSource', id });
+    const setTarget = (id: LanguageId) => dispatch({ type: 'setTarget', id });
+
+    return {
+      pair: state.pair,
+      canSwap: canSwap(state.pair),
+      recent: { source: state.recentSource, target: state.recentTarget },
+      setSource,
+      setTarget,
+      select: (field, id) => (field === 'source' ? setSource(id) : setTarget(id)),
       swap: () => dispatch({ type: 'swap' }),
-    }),
-    [pair],
-  );
+    };
+  }, [state]);
 
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
 }

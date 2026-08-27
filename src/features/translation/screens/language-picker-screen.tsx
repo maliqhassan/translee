@@ -1,124 +1,123 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { FlatList } from 'react-native';
+import { useCallback } from 'react';
+import { FlatList, Platform, View, type ListRenderItemInfo } from 'react-native';
 
 import {
   Divider,
   EmptyState,
-  Icon,
   IconButton,
-  Input,
-  ListItem,
   Screen,
   ScreenHeader,
-  Text,
+  SearchField,
+  SectionHeader,
 } from '@/components';
-import { LANGUAGES, TARGET_LANGUAGES } from '@/constants';
 import { useTheme } from '@/hooks';
-import { useLanguagePair } from '@/store';
-import type { Language, LanguageCode } from '@/types';
+import type { LanguageField } from '@/store';
 
-import type { LanguageField } from '../components/language-bar';
+import { LanguageChipRow } from '../components/language-chip';
+import { LanguageRow } from '../components/language-row';
+import { useLanguagePicker, type PickerRow } from '../hooks/use-language-picker';
 
 /**
  * Full-screen language chooser pushed from the translate, camera and voice
  * flows. It writes straight to the language store, so callers only navigate.
  *
- * The list is the static reference set from `constants/languages`; the fuller
- * catalogue (with per-pair offline availability) replaces `LANGUAGES` later.
+ * Headers, shortlists and the catalogue are flattened into one FlatList so the
+ * whole screen stays virtualised as the catalogue grows.
  */
 export function LanguagePickerScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { field } = useLocalSearchParams<{ field?: LanguageField }>();
-  const { pair, setSource, setTarget } = useLanguagePair();
 
-  const isSource = field !== 'target';
-  const selected = isSource ? pair.source : pair.target;
-  const [query, setQuery] = useState('');
+  // Any value other than an explicit `target` picks the source side.
+  const side: LanguageField = field === 'target' ? 'target' : 'source';
+  const dismiss = useCallback(() => router.back(), [router]);
+  const picker = useLanguagePicker(side, dismiss);
 
-  const results = useMemo<readonly Language[]>(() => {
-    const pool = isSource ? LANGUAGES : TARGET_LANGUAGES;
-    const needle = query.trim().toLowerCase();
-    if (!needle) return pool;
-    return pool.filter(
-      (language) =>
-        language.name.toLowerCase().includes(needle) ||
-        language.nativeName.toLowerCase().includes(needle) ||
-        language.code.toLowerCase() === needle,
-    );
-  }, [isSource, query]);
+  const { selectedId, otherSideId, select } = picker;
+  const otherSideLabel = side === 'source' ? 'Target' : 'Source';
 
-  const choose = (code: LanguageCode) => {
-    if (isSource) setSource(code);
-    else setTarget(code);
-    router.back();
-  };
+  const renderItem = useCallback(
+    ({ item }: ListRenderItemInfo<PickerRow>) => {
+      if (item.kind === 'section') {
+        return (
+          <View style={{ paddingHorizontal: theme.spacing.base, paddingTop: theme.spacing.base }}>
+            <SectionHeader title={item.title} />
+          </View>
+        );
+      }
+
+      if (item.kind === 'chips') {
+        return (
+          <LanguageChipRow languages={item.languages} selectedId={selectedId} onSelect={select} />
+        );
+      }
+
+      return (
+        <LanguageRow
+          language={item.language}
+          isSelected={item.language.id === selectedId}
+          otherSideLabel={item.language.id === otherSideId ? otherSideLabel : undefined}
+          onSelect={select}
+        />
+      );
+    },
+    [otherSideId, otherSideLabel, select, selectedId, theme.spacing.base],
+  );
 
   return (
     <Screen
+      edgeToEdge
       header={
-        <ScreenHeader
-          compact
-          title={isSource ? 'Translate from' : 'Translate to'}
-          actions={
-            <IconButton
-              name="close"
-              variant="soft"
-              accessibilityLabel="Close"
-              onPress={() => router.back()}
-            />
-          }
-        />
+        <View style={{ paddingHorizontal: theme.layout.screenPadding }}>
+          <ScreenHeader
+            compact
+            title={side === 'source' ? 'Translate from' : 'Translate to'}
+            actions={
+              <IconButton
+                name="close"
+                variant="soft"
+                accessibilityLabel="Close language picker"
+                onPress={dismiss}
+              />
+            }
+          />
+          <SearchField
+            value={picker.query}
+            onChangeText={picker.setQuery}
+            onClear={picker.clearQuery}
+            placeholder="Search by name or code"
+            accessibilityLabel="Search languages by name, native name or code"
+          />
+        </View>
       }
     >
-      <Input
-        value={query}
-        onChangeText={setQuery}
-        placeholder="Search languages"
-        autoCorrect={false}
-        autoCapitalize="none"
-        returnKeyType="search"
-        accessibilityLabel="Search languages"
-        containerStyle={{ marginBottom: theme.spacing.base }}
-      />
-
       <FlatList
-        data={results}
-        keyExtractor={(item) => item.code}
+        data={picker.rows}
+        keyExtractor={(item) => item.key}
+        renderItem={renderItem}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
-        ItemSeparatorComponent={() => <Divider inset={theme.spacing.base} />}
+        ItemSeparatorComponent={({ leadingItem }: { leadingItem?: PickerRow }) =>
+          leadingItem?.kind === 'language' ? <Divider inset={theme.spacing.base} /> : null
+        }
         contentContainerStyle={
-          results.length === 0 ? { flexGrow: 1 } : { paddingBottom: theme.spacing.xxxl }
+          picker.rows.length === 0
+            ? { flexGrow: 1 }
+            : { paddingTop: theme.spacing.sm, paddingBottom: theme.spacing.xxxl }
         }
         ListEmptyComponent={
           <EmptyState
             icon="search-outline"
             title="No languages found"
-            description={`Nothing matches “${query.trim()}”.`}
+            description={`Nothing matches “${picker.query.trim()}”. Try a name, a native name or a code like DE.`}
           />
         }
-        renderItem={({ item }) => {
-          const isSelected = item.code === selected;
-          return (
-            <ListItem
-              title={item.name}
-              subtitle={item.nativeName === item.name ? undefined : item.nativeName}
-              onPress={() => choose(item.code)}
-              showChevron={false}
-              trailing={
-                isSelected ? (
-                  <Icon name="checkmark-circle" color="primary" />
-                ) : item.code === 'auto' ? undefined : (
-                  <Text variant="caption" color="textMuted">
-                    {item.code.toUpperCase()}
-                  </Text>
-                )
-              }
-            />
-          );
-        }}
+        initialNumToRender={14}
+        maxToRenderPerBatch={16}
+        windowSize={9}
+        removeClippedSubviews={Platform.OS === 'android'}
       />
     </Screen>
   );

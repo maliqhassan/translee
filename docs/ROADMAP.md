@@ -34,6 +34,22 @@ intentionally unimplemented.
   German
 - Friendly error copy in `constants/messages.ts`; technical detail stays in logs
 
+## Day 3 -- Language catalogue and picker (done)
+
+- Single authoritative catalogue of 89 languages in
+  `constants/language-catalog.ts`, read only through the selectors in
+  `constants/languages.ts`. No component defines language metadata.
+- `Language` gains `id`, `isPopular`, `supportsOnline` and structured
+  `offline` metadata. Script and region variants (`zh-Hans`, `zh-Hant`,
+  `pt-BR`, `pt-PT`) are distinct ids that report the same base `code`.
+- Language picker rebuilt: search by name, native name or code with
+  accent-insensitive matching, Recent and Popular shortlists, selected state,
+  clear button and an empty state — all in one virtualised FlatList.
+- Language pair rules extracted to `store/language-pair-rules.ts` (pure, so
+  they are testable) and recent languages tracked per side, in memory.
+- `language-availability.ts` combines catalogue metadata with pack status,
+  which is the seam the download days need.
+
 ## Not yet built
 
 Left deliberately for later days, each with its seam already in place:

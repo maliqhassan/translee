@@ -1,4 +1,4 @@
-import type { LanguageCode } from './language';
+import type { LanguageId } from './language';
 
 /** Where a piece of text came from. Drives history icons and analytics. */
 export type TranslationSource = 'text' | 'camera' | 'voice' | 'clipboard';
@@ -13,8 +13,8 @@ export type TranslationEngine = 'online' | 'offline' | 'mock';
 
 export type TranslationRequest = {
   text: string;
-  sourceLanguage: LanguageCode;
-  targetLanguage: LanguageCode;
+  sourceLanguage: LanguageId;
+  targetLanguage: LanguageId;
   origin: TranslationSource;
 };
 
@@ -22,10 +22,10 @@ export type TranslationResult = {
   id: string;
   sourceText: string;
   translatedText: string;
-  sourceLanguage: LanguageCode;
+  sourceLanguage: LanguageId;
   /** Set when `sourceLanguage` was `auto` and the engine detected one. */
-  detectedLanguage?: LanguageCode;
-  targetLanguage: LanguageCode;
+  detectedLanguage?: LanguageId;
+  targetLanguage: LanguageId;
   engine: TranslationEngine;
   origin: TranslationSource;
   /** Epoch milliseconds. */

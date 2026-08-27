@@ -2,15 +2,14 @@ import { Pressable, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
 import { Card, Icon, Text } from '@/components';
-import { getLanguage } from '@/constants';
-import { useTheme } from '@/hooks';
-import type { LanguageCode } from '@/types';
-
-export type LanguageField = 'source' | 'target';
+import { getLanguage, isAutoDetect, languageShortCode } from '@/constants';
+import { useResponsive, useTheme } from '@/hooks';
+import type { LanguageField } from '@/store';
+import type { LanguageId } from '@/types';
 
 export type LanguageBarProps = {
-  source: LanguageCode;
-  target: LanguageCode;
+  source: LanguageId;
+  target: LanguageId;
   canSwap: boolean;
   onSelect: (field: LanguageField) => void;
   onSwap: () => void;
@@ -18,19 +17,23 @@ export type LanguageBarProps = {
 
 type ChipProps = {
   field: LanguageField;
-  code: LanguageCode;
+  id: LanguageId;
   onPress: () => void;
 };
 
 const FIELD_LABEL: Record<LanguageField, string> = { source: 'From', target: 'To' };
 
-function LanguageChip({ field, code, onPress }: ChipProps) {
+function LanguageChip({ field, id, onPress }: ChipProps) {
   const theme = useTheme();
-  const language = getLanguage(code);
-  const name = language?.name ?? code;
+  const { isNarrow } = useResponsive();
+
+  // All display metadata comes from the catalogue; nothing is hardcoded here.
+  const language = getLanguage(id);
+  const name = language?.name ?? id;
   const isTarget = field === 'target';
-  // `auto` has no meaningful code to show alongside the label.
-  const shortCode = code === 'auto' ? undefined : code.toUpperCase();
+  const shortCode = isAutoDetect(id) ? undefined : languageShortCode(id);
+  const nativeName =
+    language && language.nativeName !== language.name ? language.nativeName : undefined;
 
   return (
     <Pressable
@@ -60,6 +63,7 @@ function LanguageChip({ field, code, onPress }: ChipProps) {
           </Text>
         ) : null}
       </View>
+
       <Text
         variant="bodyLarge"
         color={isTarget ? 'primary' : 'text'}
@@ -68,6 +72,13 @@ function LanguageChip({ field, code, onPress }: ChipProps) {
       >
         {name}
       </Text>
+
+      {/* The endonym is the useful second line, but only where it fits. */}
+      {nativeName && !isNarrow ? (
+        <Text variant="caption" color="textMuted" numberOfLines={1}>
+          {nativeName}
+        </Text>
+      ) : null}
     </Pressable>
   );
 }
@@ -93,7 +104,7 @@ export function LanguageBar({ source, target, canSwap, onSelect, onSwap }: Langu
   return (
     <Card variant="elevated" padding="xs" elevation="sm">
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        <LanguageChip field="source" code={source} onPress={() => onSelect('source')} />
+        <LanguageChip field="source" id={source} onPress={() => onSelect('source')} />
 
         <Pressable
           onPress={handleSwap}
@@ -121,7 +132,7 @@ export function LanguageBar({ source, target, canSwap, onSelect, onSwap }: Langu
           </Animated.View>
         </Pressable>
 
-        <LanguageChip field="target" code={target} onPress={() => onSelect('target')} />
+        <LanguageChip field="target" id={target} onPress={() => onSelect('target')} />
       </View>
     </Card>
   );

@@ -16,6 +16,11 @@ export type ListItemProps = {
   /** Shows a chevron. Defaults to true when `onPress` is provided. */
   showChevron?: boolean;
   destructive?: boolean;
+  /** Overrides the label read out; defaults to title plus subtitle. */
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
+  /** Announced as selected, for pickers and option lists. */
+  selected?: boolean;
 };
 
 /** Row primitive for settings, language pickers and history lists. */
@@ -27,6 +32,9 @@ export function ListItem({
   onPress,
   showChevron,
   destructive = false,
+  accessibilityLabel,
+  accessibilityHint,
+  selected,
 }: ListItemProps) {
   const theme = useTheme();
   const chevron = showChevron ?? (Boolean(onPress) && !trailing);
@@ -36,6 +44,9 @@ export function ListItem({
       onPress={onPress}
       disabled={!onPress}
       accessibilityRole={onPress ? 'button' : undefined}
+      accessibilityLabel={accessibilityLabel ?? [title, subtitle].filter(Boolean).join(', ')}
+      accessibilityHint={accessibilityHint}
+      accessibilityState={{ disabled: !onPress, selected }}
       style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',

@@ -1,5 +1,5 @@
-import { DEFAULTS } from '@/constants';
-import type { LanguageCode, TranslationRequest, TranslationResult } from '@/types';
+import { DEFAULTS, getLanguage } from '@/constants';
+import type { LanguageCode, LanguageId, TranslationRequest, TranslationResult } from '@/types';
 import { appError, createId, err, ok } from '@/utils';
 
 import type { ServiceResult } from '../types';
@@ -29,9 +29,17 @@ function isMockLanguage(code: LanguageCode): boolean {
   return MOCK_LANGUAGES.includes(code);
 }
 
+/**
+ * The pair carries catalogue ids; the demo dictionary is keyed by bare ISO
+ * codes. Variants collapse onto their base code, so `zh-Hans` asks about `zh`.
+ */
+function toCode(id: LanguageId): LanguageCode {
+  return getLanguage(id)?.code ?? id;
+}
+
 /** `auto` is resolved before lookup; the sample engine only ever guesses English. */
-function resolveSource(code: LanguageCode): LanguageCode {
-  return code === 'auto' ? 'en' : code;
+function resolveSource(id: LanguageId): LanguageCode {
+  return id === 'auto' ? 'en' : toCode(id);
 }
 
 export const mockTranslationService: TranslationService = {
@@ -42,8 +50,8 @@ export const mockTranslationService: TranslationService = {
     return true;
   },
 
-  async supportsPair(source: LanguageCode, target: LanguageCode) {
-    return isMockLanguage(resolveSource(source)) && isMockLanguage(target);
+  async supportsPair(source: LanguageId, target: LanguageId) {
+    return isMockLanguage(resolveSource(source)) && isMockLanguage(toCode(target));
   },
 
   async translate(request: TranslationRequest): ServiceResult<TranslationResult> {
@@ -58,27 +66,24 @@ export const mockTranslationService: TranslationService = {
     }
 
     const source = resolveSource(request.sourceLanguage);
-    const { targetLanguage } = request;
+    const target = toCode(request.targetLanguage);
 
-    if (!isMockLanguage(source) || !isMockLanguage(targetLanguage)) {
+    if (!isMockLanguage(source) || !isMockLanguage(target)) {
       return err(
-        appError(
-          'unsupported_language',
-          `Sample engine has no data for ${source}/${targetLanguage}.`,
-        ),
+        appError('unsupported_language', `Sample engine has no data for ${source}/${target}.`),
       );
     }
 
     await delay(simulatedLatency(text));
 
-    if (source === targetLanguage) {
+    if (source === target) {
       return ok(buildResult(request, text, source));
     }
 
     // Known phrases pivot through English; anything else echoes back unchanged
     // and is flagged in the UI by the `mock` engine badge.
     const englishKey = toEnglishKey(source, text);
-    const translated = englishKey ? fromEnglishKey(englishKey, targetLanguage) : undefined;
+    const translated = englishKey ? fromEnglishKey(englishKey, target) : undefined;
 
     return ok(buildResult(request, translated ?? text, source));
   },
@@ -95,7 +100,7 @@ export const mockTranslationService: TranslationService = {
 function buildResult(
   request: TranslationRequest,
   translatedText: string,
-  resolvedSource: LanguageCode,
+  resolvedSource: LanguageId,
 ): TranslationResult {
   return {
     id: createId('tr'),

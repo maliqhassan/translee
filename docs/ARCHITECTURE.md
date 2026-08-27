@@ -53,6 +53,25 @@ adding connectivity checks or an offline-first preference never touches a
 screen. `TranslationRouter` is what features depend on; `TranslationService`
 is what engines implement.
 
+## The language catalogue
+
+`constants/language-catalog.ts` is the only place language metadata is
+defined; everything reads it through the selectors in `constants/languages.ts`.
+
+A `Language` carries two identifiers. `id` is the identity used by the pair,
+a translation request and a history row; it is the ISO code, plus a BCP-47
+subtag where the base code is ambiguous (`zh-Hans` vs `zh-Hant`). `code` is
+the bare ISO code an engine keys off. Both Chinese entries report `zh`.
+
+`offline` is structured rather than a boolean so the download days have
+somewhere to put the model identity and size. Every entry reports
+`supported: false` until a real model is chosen — that is a data edit, not a
+refactor. `services/language-packs/language-availability.ts` combines that
+metadata with pack install state, and does no I/O.
+
+Pair transitions live in `store/language-pair-rules.ts` as pure functions, so
+the swap-on-collision rule can be tested without React.
+
 ## Why routes are one-liners
 
 `app/(tabs)/index.tsx` is a single re-export. Routing then stays a map of URLs

@@ -29,7 +29,9 @@ written once and is correct in both.
 - `Card` -- elevated / outlined / filled
 - `Input` -- label, helper and error text; `bare` variant for use inside a card
 - `Badge` -- status pill (Offline, Installed, and so on)
-- `ListItem` -- the row used by settings, pickers and history
+- `SearchField` -- search input with a leading glyph and a clear button
+- `ListItem` -- the row used by settings, pickers and history; takes `selected`
+  and `accessibilityLabel` for option lists
 - `Divider`, `SectionHeader`
 - `Spinner`, `LoadingState`, `LoadingOverlay`, `Skeleton`
 - `EmptyState` -- icon, title, description, optional action

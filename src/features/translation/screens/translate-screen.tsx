@@ -5,10 +5,10 @@ import { Button, IconButton, Screen, ScreenHeader } from '@/components';
 import { APP } from '@/constants';
 import { RecentTranslations } from '@/features/history';
 import { useTheme } from '@/hooks';
-import { useLanguagePair } from '@/store';
+import { useLanguagePair, type LanguageField } from '@/store';
 
 import { BrandMark } from '../components/brand-mark';
-import { LanguageBar, type LanguageField } from '../components/language-bar';
+import { LanguageBar } from '../components/language-bar';
 import { TranslationComposer } from '../components/translation-composer';
 import { TranslationResultCard } from '../components/translation-result-card';
 import { useCopyToClipboard } from '../hooks/use-copy-to-clipboard';

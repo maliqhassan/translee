@@ -8,5 +8,6 @@ export * from './icon-button';
 export * from './input';
 export * from './list-item';
 export * from './loading';
+export * from './search-field';
 export * from './section-header';
 export * from './text';

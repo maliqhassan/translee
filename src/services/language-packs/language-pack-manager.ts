@@ -1,4 +1,4 @@
-import type { LanguageCode, Progress, Unsubscribe } from '@/types';
+import type { LanguageId, Progress, Unsubscribe } from '@/types';
 
 import type { Service, ServiceResult } from '../types';
 
@@ -8,8 +8,8 @@ export type LanguagePackStatus =
 export type LanguagePack = {
   /** Stable pack id, e.g. `en-es`. */
   id: string;
-  source: LanguageCode;
-  target: LanguageCode;
+  source: LanguageId;
+  target: LanguageId;
   /** Display size of the download. */
   sizeBytes: number;
   version: string;
