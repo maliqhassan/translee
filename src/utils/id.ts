@@ -1,0 +1,9 @@
+/**
+ * Small, dependency-free id generator. Sortable by time because the timestamp
+ * prefix comes first, which is convenient for history rows.
+ */
+export function createId(prefix = 'id'): string {
+  const time = Date.now().toString(36);
+  const random = Math.random().toString(36).slice(2, 10);
+  return `${prefix}_${time}${random}`;
+}

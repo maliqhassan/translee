@@ -1,14 +1,20 @@
+import { useColorScheme } from 'react-native';
+
+import { themes, type ColorSchemeName, type Theme } from '@/constants';
+import { usePreferences } from '@/store';
+
+/** Resolves the user's theme preference against the OS setting. */
+export function useColorSchemeName(): ColorSchemeName {
+  const system = useColorScheme();
+  const { preferences } = usePreferences();
+  if (preferences.theme !== 'system') return preferences.theme;
+  return system === 'dark' ? 'dark' : 'light';
+}
+
 /**
- * Learn more about light and dark modes:
- * https://docs.expo.dev/guides/color-schemes/
+ * The one hook every component uses for styling. Returning the whole theme
+ * (not just colours) keeps spacing and radii out of component literals.
  */
-
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
-export function useTheme() {
-  const scheme = useColorScheme();
-  const theme = scheme === 'unspecified' ? 'light' : scheme;
-
-  return Colors[theme];
+export function useTheme(): Theme {
+  return themes[useColorSchemeName()];
 }
