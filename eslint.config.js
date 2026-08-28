@@ -7,7 +7,7 @@ module.exports = defineConfig([
   expoConfig,
   prettierConfig,
   {
-    ignores: ['dist/*', 'node_modules/*', '.expo/*', 'android/*', 'ios/*'],
+    ignores: ['dist/*', 'node_modules/*', '.expo/*', '.test-build/*', 'android/*', 'ios/*'],
   },
   {
     files: ['**/*.{js,jsx,ts,tsx}'],
@@ -24,6 +24,19 @@ module.exports = defineConfig([
         },
       ],
       'no-console': ['warn', { allow: ['warn', 'error'] }],
+    },
+  },
+  {
+    // Build and test tooling runs on Node, not in the app bundle.
+    files: ['scripts/**/*.{js,cjs,mjs}'],
+    languageOptions: {
+      globals: {
+        __dirname: 'readonly',
+        console: 'readonly',
+        module: 'writable',
+        process: 'readonly',
+        require: 'readonly',
+      },
     },
   },
   {

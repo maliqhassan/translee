@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { LanguageProvider } from './language-store';
+import { NetworkProvider } from './network-store';
 import { PreferencesProvider } from './preferences-store';
 
 /**
@@ -9,8 +10,10 @@ import { PreferencesProvider } from './preferences-store';
  */
 export function AppProviders({ children }: { children: ReactNode }) {
   return (
-    <PreferencesProvider>
-      <LanguageProvider>{children}</LanguageProvider>
-    </PreferencesProvider>
+    <NetworkProvider>
+      <PreferencesProvider>
+        <LanguageProvider>{children}</LanguageProvider>
+      </PreferencesProvider>
+    </NetworkProvider>
   );
 }

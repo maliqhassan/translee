@@ -8,4 +8,5 @@ export * from './radius';
 export * from './shadows';
 export * from './spacing';
 export * from './theme';
+export * from './translation-config';
 export * from './typography';

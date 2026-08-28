@@ -42,16 +42,48 @@ feature owns that data and its presentation, and home just places it.
 The UI never selects an engine:
 
 ```
-TranslateScreen -> useTranslation -> services.translation.router
-                                       -> mock | online | offline engine
+TranslateScreen -> useTranslation -> services.translation.router (cached)
+                                       -> TranslationRouter
+                                            -> mock | online | offline engine
+
+OnlineTranslationService -> TranslationProvider -> ProviderAdapter -> wire
 ```
 
-`createTranslationRouter` takes an ordered candidate list and picks the first
-engine that is both available and supports the requested pair. That list is
-built in `service-registry.ts`, which makes routing policy a one-line change:
-adding connectivity checks or an offline-first preference never touches a
-screen. `TranslationRouter` is what features depend on; `TranslationService`
-is what engines implement.
+The router is wrapped by `withCache`, a decorator that adds an LRU cache and
+collapses concurrent identical requests onto one call. Keeping it a decorator
+means the cache applies to whichever engine ran, and each concern stays
+separately testable. Only successes are cached: a failure is usually about the
+moment, and caching it would make a recovered service look broken.
+
+`orderEngines` in `routing-policy.ts` is a pure function that ranks candidates
+by connectivity and preference. It reorders but never removes, because an
+engine's own `isAvailable` is the authority on whether it can run.
+
+`TranslationProvider` is a reachable source of translations, and
+`ProviderAdapter` validates one wire format. A second provider, or a changed
+response shape, is a new adapter and nothing else.
+
+`createTranslationRouter` validates the request, asks the network service for
+connectivity, ranks the candidates and picks the first that is both available
+and supports the pair. Validating there means a request that could never
+succeed fails immediately rather than after a round trip. The candidate list is
+built in `service-registry.ts`. `TranslationRouter` is what features depend on;
+`TranslationService` is what engines implement.
+
+### Keeping the provider key off the device
+
+The app never holds a provider credential. It knows one public URL — its own
+backend — and that backend holds the key:
+
+```
+app  ->  Transee backend  ->  Google / DeepL / Microsoft
+         (holds the key)
+```
+
+`EXPO_PUBLIC_*` variables are inlined into the bundle at build time, so only
+non-secret values may go there. `constants/translation-config.ts` is the single
+place client configuration is declared, and a test asserts it carries nothing
+credential-shaped.
 
 ## The language catalogue
 

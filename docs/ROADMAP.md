@@ -50,6 +50,31 @@ intentionally unimplemented.
 - `language-availability.ts` combines catalogue metadata with pack status,
   which is the seam the download days need.
 
+## Day 4 -- Translation service infrastructure (done)
+
+- HTTP layer: `HttpClient` seam, a fetch implementation with an
+  AbortController timeout, status-to-AppError mapping, and a conservative
+  retry policy that retries only dropped connections, timeouts and 5xx
+- `OnlineTranslationService` built against a configurable Transee backend
+  URL, reached through `TranslationProvider` and a validating `ProviderAdapter`
+- Responses are validated field by field; a malformed body becomes
+  `invalid_response` rather than a result with undefined text in it
+- Network abstraction over expo-network with online / offline / unknown, plus
+  a `NetworkProvider` for the UI side of the same fact
+- Router now validates, consults connectivity and ranks engines through the
+  pure `orderEngines` policy; returns a friendly offline error when nothing
+  can serve the pair
+- `withCache` decorator adds an LRU translation cache and request
+  de-duplication around whichever engine runs
+- New error codes: timeout, rate_limited, invalid_request, invalid_response,
+  each with user-facing copy in `constants/messages.ts`
+- Unit test runner on Node's built-in test module, zero new dependencies;
+  111 tests including the Day 2 and Day 3 behaviour as regression cover
+
+No provider API is called and no credential exists in the app. With no backend
+URL configured, the online engine reports itself unavailable and the sample
+engine continues to serve development.
+
 ## Not yet built
 
 Left deliberately for later days, each with its seam already in place:

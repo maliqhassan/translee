@@ -9,9 +9,14 @@ export type AsyncState<T> =
 
 export type AppErrorCode =
   | 'network_unavailable'
+  | 'timeout'
   | 'not_implemented'
   | 'service_unavailable'
+  | 'rate_limited'
   | 'permission_denied'
+  | 'invalid_request'
+  /** A response arrived but did not match the shape we require. */
+  | 'invalid_response'
   | 'unsupported_language'
   | 'model_missing'
   | 'storage_error'

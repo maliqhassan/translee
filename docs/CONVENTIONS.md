@@ -33,13 +33,26 @@ repository or a feature hook.
 Half-built capabilities stay behind a flag in `src/constants/config.ts` so the
 main branch is always shippable.
 
+## Tests
+
+`npm test` compiles the app and `tests/` to CommonJS and runs them on Node's
+built-in test runner. No test framework is installed: the runner is a script,
+and `scripts/test-register.cjs` resolves the `@/` alias and stubs the two
+native modules the service layer imports.
+
+Tests import the real modules. Where a boundary has to be faked it is faked at
+a seam the production code already has -- an injected `fetchImpl`, an
+`HttpClient`, a `NetworkService` -- never by reimplementing the logic under
+test.
+
 ## Commands
 
-| Command             | Purpose                         |
-| ------------------- | ------------------------------- |
-| `npm start`         | Expo dev server                 |
-| `npm run android`   | Build and run on Android        |
-| `npm run typecheck` | `tsc --noEmit`                  |
-| `npm run lint`      | ESLint                          |
-| `npm run format`    | Prettier write                  |
-| `npm run check`     | typecheck + lint + format check |
+| Command             | Purpose                                |
+| ------------------- | -------------------------------------- |
+| `npm start`         | Expo dev server                        |
+| `npm run android`   | Build and run on Android               |
+| `npm run typecheck` | `tsc --noEmit`                         |
+| `npm run lint`      | ESLint                                 |
+| `npm run format`    | Prettier write                         |
+| `npm test`          | unit tests                             |
+| `npm run check`     | typecheck + lint + format check + test |
