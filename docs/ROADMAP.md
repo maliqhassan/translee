@@ -159,6 +159,26 @@ No runtime ships yet: the registered engine reports unavailable, and every
 catalogue entry still says `offline.supported: false`. Integration needs a
 development build and is Day 9.
 
+## Day 9 -- ML Kit integration (written, not yet built)
+
+- Re-checked the published binding rather than assuming: still 0.5.0 from
+  September 2025, no codegenConfig, legacy ReactContextBaseJavaModule, no Expo
+  plugin. Unusable on RN 0.86, so it was not installed.
+- Wrote a local Expo module instead, modules/transee-mlkit: Kotlin, Android
+  only, New-Architecture native via the Expo Modules API, seven functions and
+  no policy. No npm dependency added.
+- createMlKitOfflineEngine implements the Day 8 OfflineTranslationEngine
+  contract against it, with the native module injected so the whole engine is
+  testable without a device.
+- Explicit language mapping: 55 of 89 catalogue languages. Chinese and
+  Portuguese variants are excluded because ML Kit has only unqualified zh and
+  pt, and promising a variant we cannot guarantee would be a lie.
+- No progress, size or checksum is reported, because ML Kit exposes none.
+
+Nothing has been compiled or run: this machine has no Android SDK. Autolinking
+discovers the module and the bundle still exports, but the Kotlin is unverified
+until Day 10 builds it on a real device.
+
 ## Not yet built
 
 Left deliberately for later days, each with its seam already in place:

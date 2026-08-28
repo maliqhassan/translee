@@ -49,6 +49,16 @@ const STUBS = {
    * Preferences tests drive `createPreferencesService` with an in-memory
    * storage slot, so the file-backed implementation is never exercised here.
    */
+  /**
+   * The ML Kit module is resolved optionally, so under Node it simply is not
+   * there — which is exactly the "no native build" case the engine must handle.
+   */
+  'expo-modules-core': {
+    requireOptionalNativeModule: () => null,
+    requireNativeModule: () => {
+      throw new Error('Native modules are unavailable under Node.');
+    },
+  },
   'expo-file-system': {
     File: class {
       get exists() {
@@ -68,6 +78,13 @@ for (const [name, exports] of Object.entries(STUBS)) {
 const originalResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...rest) {
   if (Object.prototype.hasOwnProperty.call(STUBS, request)) return `stub:${request}`;
+  if (request.startsWith('@modules/')) {
+    return originalResolve.call(
+      this,
+      path.join(REPO_ROOT, '.test-build', 'modules', request.slice('@modules/'.length)),
+      ...rest,
+    );
+  }
   if (request.startsWith('@shared/')) {
     return originalResolve.call(
       this,

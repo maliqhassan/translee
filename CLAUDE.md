@@ -30,4 +30,7 @@ TypeScript strict.
 7. **Preferences persist through `PreferencesService`.** No screen, component
    or hook imports a storage API; `file-preferences-storage.ts` is the only
    file importing expo-file-system.
-8. Run `npm run check` before calling work done.
+8. **Native code lives in `modules/`.** `modules/transee-mlkit` is the only
+   Kotlin in the project; it is resolved optionally, so the app still runs
+   without a native build.
+9. Run `npm run check` before calling work done.

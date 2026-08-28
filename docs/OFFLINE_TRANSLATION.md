@@ -6,14 +6,19 @@ integrated on Day 9.
 
 ## Status
 
-**No machine-translation runtime ships in the app today.** The seams described
-below are complete and tested, and the engine currently registered reports
-honestly that it cannot translate. Nothing claims offline support that does not
-have it: every entry in the language catalogue still says
-`offline.supported: false`, and the engine returns `model_missing`.
+**A real ML Kit integration is written, but it has never been compiled or run.**
 
-That is deliberate. Integrating the runtime needs a native module and a
-development build, and neither exists in this project yet.
+Day 9 replaced the placeholder engine with one that drives Google ML Kit
+through a local Expo native module. Every line of TypeScript is tested against
+a fake native module. The Kotlin has not been built, because this machine has
+no Android SDK — see _Device testing_ below for exactly what that leaves
+unverified.
+
+Until a build exists, `requireOptionalNativeModule` resolves to `null`, the
+engine reports itself unavailable, and offline mode returns `model_missing`
+rather than falling back to the network. The catalogue still reports
+`offline.supported: false` for every language: that flag is set only once a
+device confirms the models work.
 
 ## The decision
 
@@ -59,25 +64,6 @@ the runtime.
 | **llama.rn / on-device LLM**                                                            | Same objection, more so. Wrong tool: a general model doing a specific job at enormous cost in size, memory and latency.                                                                                                                                                                                                                                                    |
 | **Bergamot / Marian (Firefox Translations)**                                            | Genuinely good small MT models, but they target WASM in a browser. No React Native binding exists; we would be writing and maintaining a native module ourselves.                                                                                                                                                                                                          |
 | **TensorFlow Lite**                                                                     | Same objections as ONNX — a runtime, not a translation solution, with the tokenisation problem unsolved.                                                                                                                                                                                                                                                                   |
-
-## Why the integration is not done today
-
-Two independent blockers, both real:
-
-1. **A native module needs a development build.** ML Kit is an Android library;
-   it cannot run in Expo Go, and this project has no development build. That is
-   a known, separately-tracked gap (see [DEVICE_TESTING.md](DEVICE_TESTING.md)),
-   and there is no Android SDK on the current machine to produce one.
-
-2. **The available React Native binding is not verifiably compatible.** The only
-   maintained-looking npm package for ML Kit translation,
-   `@react-native-ml-kit/translate-text`, was last published in **September
-   2025** at version 0.5.0. It ships **no Expo config plugin** and makes no
-   New Architecture claim. React Native 0.86 is New-Architecture-only. Adding a
-   native dependency that cannot be built or run here would be guessing.
-
-So Day 8 built the seams instead, and Day 9 does the integration on a machine
-that can build and run it.
 
 ## Architecture
 
@@ -149,17 +135,110 @@ literally:
 - ML Kit needs **no API key**, so nothing credential-shaped enters the bundle.
 - No analytics or telemetry was added.
 
-## What Day 9 must do
+## The integration (Day 9)
 
-1. Create an Android development build (needs Android Studio + SDK, or EAS).
-2. Evaluate `@react-native-ml-kit/translate-text` against RN 0.86 and the New
-   Architecture on that build. If it does not work, the fallback is a small
-   Expo module wrapping ML Kit's translate API directly — the seam makes either
-   choice invisible to the app.
-3. Implement `OfflineTranslationEngine` over it, and register it in place of
-   `unavailableOfflineEngine`.
-4. Populate `RuntimeCapability.languages` from ML Kit's real language list,
-   mapped onto Transee LanguageIds — keeping `zh-Hans` / `zh-Hant` and the
-   Portuguese variants distinct.
-5. Only then, set `offline.supported` on the catalogue entries the runtime
-   actually covers, with the real model size.
+### Why a custom module, not the published binding
+
+`@react-native-ml-kit/translate-text` was re-checked rather than assumed, and it
+is not usable here:
+
+- still 0.5.0, last published **2025-09-01**
+- **no `codegenConfig`** in its package.json, and its Android source extends
+  `ReactContextBaseJavaModule` — an old-architecture bridge module
+- ships **no Expo config plugin** (25 files; only a podspec and a build.gradle)
+
+React Native 0.86 is New-Architecture-only, so a legacy bridge module is at best
+interop-dependent and at worst broken, and nothing available here could verify
+which.
+
+So Day 9 wrote a small local Expo module instead: `modules/transee-mlkit`. The
+Expo Modules API is New-Architecture native, needs no config plugin, and
+autolinks straight from the `modules/` directory with nothing published to npm.
+**No npm dependency was added.**
+
+### The native surface
+
+Deliberately tiny — seven functions, and no policy:
+
+`getSupportedLanguages`, `getDownloadedLanguages`, `downloadModel`,
+`deleteModel`, `translate`, `closeTranslator`, `closeAll`.
+
+Routing, pair readiness and error mapping all stay in TypeScript, where they are
+testable. The Kotlin holds one thing of substance: a translator cache keyed by
+pair, closed on teardown so native resources are not leaked.
+
+The TypeScript layer refuses to call `translate` unless both models are already
+downloaded, which is what keeps offline mode genuinely offline rather than
+letting ML Kit quietly fetch a model mid-translation.
+
+### Language mapping: 55 of 89
+
+ML Kit exposes **59** languages; our catalogue has 89. The join is explicit in
+`mlkit-languages.ts`, and the rule is deliberately strict: a LanguageId maps
+only when it is itself an ML Kit code, or has an alias that is unambiguous.
+
+| Case                               | Decision                                                         |
+| ---------------------------------- | ---------------------------------------------------------------- |
+| `en de es fr ja ar ur` + 46 others | direct match, supported                                          |
+| `nb` to `no`, `fil` to `tl`        | aliased: one catalogue entry, one ML Kit code, nothing ambiguous |
+| `zh-Hans`, `zh-Hant`               | **excluded** — ML Kit has one unqualified `zh`                   |
+| `pt-BR`, `pt-PT`                   | **excluded** — ML Kit has one unqualified `pt`                   |
+| `sr`, `mn`                         | **excluded** — ML Kit does not have them at all                  |
+
+The variant exclusions are the important judgement call. Mapping `zh-Hant` onto
+`zh` would risk returning Simplified characters to someone who asked for
+Traditional — the wrong script, not a dialect preference — and there is no way
+to know which the single model produces without running it. Rather than promise
+a variant we cannot guarantee, all four are excluded until a device settles it.
+A test asserts that no two LanguageIds ever collapse onto the same ML Kit code.
+
+`auto` is **not** an ML Kit model. Language identification is a separate ML Kit
+library this build does not include, so an `auto` source returns
+`unsupported_language` instead of a guess.
+
+### What ML Kit does not tell us
+
+Represented as absent rather than invented:
+
+- **no download progress.** The API resolves on completion with no byte count,
+  so there is no percentage to show.
+- **no model size.** The ~30MB figure is prose in the documentation, not an API
+  value, so `sizeBytes` is left undefined.
+- **no checksum.** ML Kit verifies its own downloads through Play services.
+- **no cancellation.** `RemoteModelManager.download` returns a Task with no
+  cancel, so the contract does not pretend otherwise.
+
+## Device testing
+
+**None was performed.** This machine has JDK 17 but no Android SDK, no adb, no
+Android Studio and no emulator. Nothing was compiled and nothing was run;
+`expo run:android` fails here with "Failed to resolve the Android SDK path".
+
+What _was_ verified without a device:
+
+- `npx expo prebuild --platform android` generates the native project
+- `npx expo-modules-autolinking search -p android` **discovers the module**,
+  reads its config, and resolves `expo.modules.transeemlkit.TranseeMlKitModule`
+- the JS bundle still exports cleanly with the module present, because the
+  native module is resolved optionally and degrades to `null`
+- 314 automated tests, including the whole engine driven against a fake native
+  module
+
+Still unverified, and only a device can settle it: that the Kotlin compiles,
+that ML Kit translates correctly, which script its `zh` model produces, and how
+large the downloads actually are.
+
+On a machine with Android Studio and the SDK installed:
+
+    npx expo run:android
+
+## What Day 10 must do
+
+1. Build and run on a real Android device with the command above.
+2. Confirm the Kotlin compiles and that ML Kit translates end to end.
+3. Observe which script the `zh` model produces and which variant `pt`
+   produces, then decide whether `zh-Hans` and `pt-BR` can be mapped after all.
+4. Measure a real download to replace the undefined `sizeBytes`.
+5. Only then set `offline.supported` on the catalogue entries a device has
+   actually confirmed, with measured sizes.
+6. Build the language-packs screen on top of the engine's model list.

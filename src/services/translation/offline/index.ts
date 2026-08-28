@@ -1,3 +1,4 @@
+export * from './mlkit';
 export * from './model-lifecycle';
 export * from './model-registry';
 export * from './model-runtime-manager';

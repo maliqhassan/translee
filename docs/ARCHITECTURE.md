@@ -166,7 +166,11 @@ not know is dropped rather than inventing an entry.
 `ready` is reachable only from `loading` in the lifecycle state machine, so a
 failed download or load can never be reported as usable.
 
-No runtime ships yet. See [OFFLINE_TRANSLATION.md](OFFLINE_TRANSLATION.md).
+The runtime is Google ML Kit, reached through a local Expo native module in
+modules/transee-mlkit. It is resolved optionally, so a build without the native
+module gets an engine that reports itself unavailable rather than one that
+throws. The Kotlin has not yet been compiled on a device.
+See [OFFLINE_TRANSLATION.md](OFFLINE_TRANSLATION.md).
 
 ## Preferences
 

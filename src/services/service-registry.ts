@@ -1,5 +1,6 @@
 import { FEATURES, TRANSLATION_CONFIG, hasBackendConfigured } from '@/constants';
 import { createExpoSQLiteDatabase, createHistoryRepository } from '@/database';
+import { TranseeMlKit } from '@modules/transee-mlkit';
 
 import { expoClipboardService } from './clipboard';
 import { createFetchHttpClient } from './http';
@@ -17,10 +18,11 @@ import {
   createInFlightRegistry,
   createMemoryTranslationCache,
   createNullTranslationCache,
+  createMlKitOfflineEngine,
+  createOfflineTranslationService,
   createOnlineTranslationService,
   createTranslationRouter,
   mockTranslationService,
-  offlineTranslationService,
   unconfiguredOnlineTranslationService,
   withCache,
   type TranslationService,
@@ -64,11 +66,22 @@ const onlineTranslationService: TranslationService = backendProvider.isConfigure
  * takes over, with offline as the second candidate once it exists.
  * `FEATURES.mockTranslation` forces the sample engine either way.
  */
+/**
+ * The on-device engine.
+ *
+ * `TranseeMlKit` is null unless the native module was compiled into this build,
+ * so a JS-only bundle or Expo Go gets an engine that reports itself unavailable
+ * rather than one that throws. Nothing else in the app changes either way.
+ */
+const offlineEngine = createOfflineTranslationService(
+  createMlKitOfflineEngine({ native: TranseeMlKit }),
+);
+
 const useSampleEngine = FEATURES.mockTranslation || !hasBackendConfigured();
 
 const translationEngines: readonly TranslationService[] = useSampleEngine
   ? [mockTranslationService]
-  : [onlineTranslationService, offlineTranslationService];
+  : [onlineTranslationService, offlineEngine];
 
 const translationCache = TRANSLATION_CONFIG.cache.enabled
   ? createMemoryTranslationCache({ maxEntries: TRANSLATION_CONFIG.cache.maxEntries })
@@ -96,7 +109,7 @@ export const services = {
     /** What the UI calls. It never picks an engine itself. */
     router: translationRouter,
     online: onlineTranslationService,
-    offline: offlineTranslationService,
+    offline: offlineEngine,
     /** Exposed so settings can offer a "clear cached translations" action. */
     cache: translationCache,
   },
