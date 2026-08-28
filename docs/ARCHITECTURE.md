@@ -103,6 +103,53 @@ and both sides read that one file:
 Two catalogue languages have no provider equivalent and correctly return
 `unsupported_language`.
 
+## Persistence
+
+Translation history is stored locally in SQLite. Nothing above the repository
+knows that:
+
+```
+screen -> useHistory* hook -> HistoryRepository -> Database -> SQLite
+```
+
+`Database` (Day 1) is the driver seam. The app binds it to expo-sqlite; the
+test suite binds it to Node's built-in SQLite and runs the very same
+repository SQL against a real engine. Only the driver is ever substituted.
+
+### Migrations
+
+`migration-runner.ts` applies anything above SQLite's own `user_version`,
+then stamps it. Keeping the marker in the file rather than a table of our own
+avoids a bootstrap problem and means the version travels with a backup. Every
+statement uses `IF NOT EXISTS`, so a replay is safe and running twice does
+nothing. Migrations are append-only and never edited once shipped.
+
+### Startup
+
+`DatabaseProvider` opens the database and migrates once, off the render path,
+and publishes `initializing | ready | error`. It deliberately does **not**
+gate rendering: translating works without storage, so a history problem must
+not become an app problem. Screens that need history read the status and show
+their own loading or unavailable state.
+
+### Cache and history are different questions
+
+The translation cache answers _what result can we reuse_; history answers
+_what did the user do_. So a cache hit still writes a history row, repeated
+translations of the same text are separate rows, and a history record carries
+its own id rather than the translation result's. History never deduplicates.
+
+A failed translation writes nothing, and a failed history write never fails
+the translation the user can already see.
+
+### Privacy
+
+History holds text the user typed and what came back. It is stored only on the
+device, is never uploaded, and is deleted with the app. Nothing logs source or
+translated text, row contents, or query parameters -- statements are logged
+without their bindings. Every query is parameterised; search escapes LIKE
+wildcards so a `%` is searched for rather than matching everything.
+
 ## The language catalogue
 
 `constants/language-catalog.ts` is the only place language metadata is

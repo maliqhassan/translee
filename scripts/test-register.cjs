@@ -35,6 +35,16 @@ const STUBS = {
     getStringAsync: async () => '',
     hasStringAsync: async () => false,
   },
+  /**
+   * The native SQLite module cannot load under Node. Tests never use this
+   * driver: they build the repository over the Node SQLite driver in
+   * `tests/support`, so the SQL under test is still run by a real engine.
+   */
+  'expo-sqlite': {
+    openDatabaseAsync: async () => {
+      throw new Error('expo-sqlite is unavailable under Node; use createNodeSQLiteDatabase.');
+    },
+  },
 };
 
 for (const [name, exports] of Object.entries(STUBS)) {

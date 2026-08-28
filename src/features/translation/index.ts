@@ -8,5 +8,6 @@ export * from './hooks/use-copy-to-clipboard';
 export * from './hooks/use-language-picker';
 export * from './hooks/use-paste-from-clipboard';
 export * from './hooks/use-translation';
+export * from './record-translation';
 export * from './screens/language-picker-screen';
 export * from './screens/translate-screen';

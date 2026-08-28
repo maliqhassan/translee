@@ -1,4 +1,5 @@
 import { FEATURES, TRANSLATION_CONFIG, hasBackendConfigured } from '@/constants';
+import { createExpoSQLiteDatabase, createHistoryRepository } from '@/database';
 
 import { expoClipboardService } from './clipboard';
 import { createFetchHttpClient } from './http';
@@ -73,6 +74,13 @@ const translationRouter = withCache(
   { cache: translationCache, inFlight: createInFlightRegistry() },
 );
 
+/**
+ * Local persistence. The database driver is bound here like any other
+ * implementation, so features depend on `HistoryRepository` and never on
+ * expo-sqlite.
+ */
+const historyRepository = createHistoryRepository(createExpoSQLiteDatabase());
+
 export const services = {
   translation: {
     /** What the UI calls. It never picks an engine itself. */
@@ -82,6 +90,8 @@ export const services = {
     /** Exposed so settings can offer a "clear cached translations" action. */
     cache: translationCache,
   },
+  /** Persistent translation history. Call `initialize()` before querying. */
+  history: historyRepository,
   network: expoNetworkService,
   clipboard: expoClipboardService,
   ocr: ocrService,

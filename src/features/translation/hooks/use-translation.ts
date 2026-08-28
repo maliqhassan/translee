@@ -1,9 +1,10 @@
 import { useCallback, useRef, useState } from 'react';
 
-import { recordTranslation } from '@/features/history';
 import { services } from '@/services';
 import { useLanguagePair } from '@/store';
 import type { AsyncState, LanguageCode, TranslationResult } from '@/types';
+
+import { translateAndRecord } from '../record-translation';
 
 export type TranslationController = {
   input: string;
@@ -75,24 +76,25 @@ export function useTranslation(): TranslationController {
 
     settle({ status: 'loading' }, source, target);
 
-    void services.translation.router
-      .translate({ text, sourceLanguage: source, targetLanguage: target, origin: 'text' })
-      .then((result) => {
-        if (id !== requestId.current) return;
-        if (result.ok) {
-          // Recent translations read from the session store; a cache replay is
-          // de-duplicated there rather than here.
-          recordTranslation(result.value);
-        }
+    // Recording happens inside `translateAndRecord` regardless of staleness:
+    // the user did perform this translation, so it belongs in history even if
+    // they have since typed something else.
+    void translateAndRecord(services.translation.router, services.history, {
+      text,
+      sourceLanguage: source,
+      targetLanguage: target,
+      origin: 'text',
+    }).then((result) => {
+      if (id !== requestId.current) return;
 
-        settle(
-          result.ok
-            ? { status: 'success', data: result.value }
-            : { status: 'error', error: result.error },
-          source,
-          target,
-        );
-      });
+      settle(
+        result.ok
+          ? { status: 'success', data: result.value }
+          : { status: 'error', error: result.error },
+        source,
+        target,
+      );
+    });
   }, [input, pair, settle]);
 
   const reset = useCallback(() => {

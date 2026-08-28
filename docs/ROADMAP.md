@@ -96,6 +96,27 @@ engine continues to serve development.
 Real provider integration needs a manually supplied Azure key; everything was
 verified end to end against the deterministic fake provider.
 
+## Day 6 -- Persistent history (done)
+
+- Translation history now lives in SQLite via expo-sqlite, behind the Day 1
+  `Database` seam. No component or hook touches SQLite.
+- `HistoryRepository`: create, getById, listRecent, listFavorites, search,
+  setFavorite, toggleFavorite, remove, clear, count, plus change
+  notifications so screens refresh without polling.
+- Migration runner keyed on SQLite's `user_version`; migrations are
+  append-only, idempotent and safe to replay. Schema is at version 2.
+- `DatabaseProvider` initialises once at startup without gating rendering, so
+  translation still works if storage fails and history reports its own state.
+- History screen gained search, delete and clear-all with confirmations; the
+  detail screen loads the real record and handles a deleted one.
+- Favourites persist on the history row -- no second table.
+- Search, ordering and paging are done by SQLite, never in JavaScript, and
+  every query is parameterised with LIKE wildcards escaped.
+- The in-memory session store and its sample data are gone.
+
+History is device-local, never uploaded, and no source or translated text is
+ever logged.
+
 ## Not yet built
 
 Left deliberately for later days, each with its seam already in place:

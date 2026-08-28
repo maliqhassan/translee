@@ -1,5 +1,8 @@
+import { View } from 'react-native';
+
 import { IconButton, ListItem } from '@/components';
-import { getLanguage } from '@/constants';
+import { languageName } from '@/constants';
+import { useTheme } from '@/hooks';
 import type { HistoryEntry } from '@/types';
 import { formatRelativeTime, truncate } from '@/utils';
 
@@ -7,6 +10,7 @@ export type HistoryListItemProps = {
   entry: HistoryEntry;
   onPress?: (entry: HistoryEntry) => void;
   onToggleFavorite?: (entry: HistoryEntry) => void;
+  onDelete?: (entry: HistoryEntry) => void;
 };
 
 const ORIGIN_ICONS = {
@@ -17,22 +21,43 @@ const ORIGIN_ICONS = {
 } as const;
 
 /** One saved translation. Pure presentation — persistence lives in the repository. */
-export function HistoryListItem({ entry, onPress, onToggleFavorite }: HistoryListItemProps) {
-  const target = getLanguage(entry.targetLanguage)?.name ?? entry.targetLanguage;
+export function HistoryListItem({
+  entry,
+  onPress,
+  onToggleFavorite,
+  onDelete,
+}: HistoryListItemProps) {
+  const theme = useTheme();
+  const source = languageName(entry.sourceLanguage);
+  const target = languageName(entry.targetLanguage);
 
   return (
     <ListItem
       icon={ORIGIN_ICONS[entry.origin]}
       title={truncate(entry.translatedText, 60)}
-      subtitle={`${target} · ${formatRelativeTime(entry.createdAt)}`}
+      subtitle={`${source} → ${target} · ${formatRelativeTime(entry.createdAt)}`}
       onPress={onPress ? () => onPress(entry) : undefined}
       showChevron={false}
+      accessibilityLabel={`${source} to ${target}. ${entry.sourceText}. Translated: ${entry.translatedText}. ${entry.isFavorite ? 'Favourite.' : ''}`}
       trailing={
-        <IconButton
-          name={entry.isFavorite ? 'star' : 'star-outline'}
-          accessibilityLabel={entry.isFavorite ? 'Remove from favourites' : 'Add to favourites'}
-          onPress={onToggleFavorite ? () => onToggleFavorite(entry) : undefined}
-        />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xxs }}>
+          <IconButton
+            name={entry.isFavorite ? 'star' : 'star-outline'}
+            accessibilityLabel={
+              entry.isFavorite
+                ? `Remove ${target} translation from favourites`
+                : `Add ${target} translation to favourites`
+            }
+            onPress={onToggleFavorite ? () => onToggleFavorite(entry) : undefined}
+          />
+          {onDelete ? (
+            <IconButton
+              name="trash-outline"
+              accessibilityLabel={`Delete ${target} translation`}
+              onPress={() => onDelete(entry)}
+            />
+          ) : null}
+        </View>
       }
     />
   );

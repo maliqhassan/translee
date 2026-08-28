@@ -24,4 +24,6 @@ TypeScript strict.
 4. **Bind services in one place.** `src/services/service-registry.ts` is the
    only file that names a concrete implementation.
 5. **Services return `Result`, never throw.**
-6. Run `npm run check` before calling work done.
+6. **No SQL outside `src/database`.** Features use `HistoryRepository`; the
+   only file importing expo-sqlite is `expo-sqlite-database.ts`.
+7. Run `npm run check` before calling work done.
