@@ -4,6 +4,9 @@ import type { LanguagePackManager } from './language-pack-manager';
 
 export * from './language-availability';
 export * from './language-pack-manager';
+export * from './file-model-storage';
+export * from './model-downloader';
+export * from './model-storage';
 
 const noop = () => {};
 const unavailable = (what: string) => Promise.resolve(err(notImplemented(what)));

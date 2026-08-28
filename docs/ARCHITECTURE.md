@@ -150,6 +150,24 @@ translated text, row contents, or query parameters -- statements are logged
 without their bindings. Every query is parameterised; search escapes LIKE
 wildcards so a `%` is searched for rather than matching everything.
 
+## On-device translation
+
+The runtime sits behind one seam, `OfflineTranslationEngine`, which
+`OfflineTranslationService` adapts into the `TranslationService` the router
+already speaks. No screen knows which runtime is used, where models live, or
+how inference happens.
+
+Models are keyed **per language**, not per pair, because the selected runtime
+is: a ready pair is derived from both sides being loaded. The catalogue stays
+authoritative for language identity, the runtime for capability, and
+`ModelRegistry` is the join. A runtime naming a language the catalogue does
+not know is dropped rather than inventing an entry.
+
+`ready` is reachable only from `loading` in the lifecycle state machine, so a
+failed download or load can never be reported as usable.
+
+No runtime ships yet. See [OFFLINE_TRANSLATION.md](OFFLINE_TRANSLATION.md).
+
 ## Preferences
 
 Settings are a handful of primitives, so they live in one small JSON document

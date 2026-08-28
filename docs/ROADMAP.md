@@ -139,6 +139,26 @@ the catalogue, the backend and the provider already support, so persisting the
 source language persists it. Haptics were deferred rather than adding a native
 module for one toggle.
 
+## Day 8 -- Offline engine foundation (done)
+
+- Runtime researched and chosen: Google ML Kit on-device Translation. The
+  decision, the alternatives rejected and the blockers are in
+  [OFFLINE_TRANSLATION.md](OFFLINE_TRANSLATION.md).
+- `OfflineTranslationEngine` is the single seam a runtime implements;
+  `OfflineTranslationService` adapts it to the router's `TranslationService`.
+- Model registry joins the catalogue with runtime capability. Models are keyed
+  **per language**, because ML Kit is -- a ready pair is derived from both
+  sides being loaded.
+- Model lifecycle as a tested state machine: `ready` is reachable only from
+  `loading`, so a failed download or load can never look usable.
+- Runtime manager loads a model once, keeps it, and collapses concurrent loads.
+- `ModelStorage` implemented over expo-file-system; `ModelDownloader` is a
+  contract only, since ML Kit fetches its own models.
+
+No runtime ships yet: the registered engine reports unavailable, and every
+catalogue entry still says `offline.supported: false`. Integration needs a
+development build and is Day 9.
+
 ## Not yet built
 
 Left deliberately for later days, each with its seam already in place:
