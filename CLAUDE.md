@@ -26,4 +26,7 @@ TypeScript strict.
 5. **Services return `Result`, never throw.**
 6. **No SQL outside `src/database`.** Features use `HistoryRepository`; the
    only file importing expo-sqlite is `expo-sqlite-database.ts`.
-7. Run `npm run check` before calling work done.
+7. **Preferences persist through `PreferencesService`.** No screen, component
+   or hook imports a storage API; `file-preferences-storage.ts` is the only
+   file importing expo-file-system.
+8. Run `npm run check` before calling work done.

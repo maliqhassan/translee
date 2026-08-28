@@ -1,4 +1,9 @@
-import type { TranslationEngine, TranslationRequest, TranslationResult } from '@/types';
+import type {
+  TranslationEngine,
+  TranslationMode,
+  TranslationRequest,
+  TranslationResult,
+} from '@/types';
 import { appError, createLogger, err } from '@/utils';
 
 import type { NetworkService, NetworkStatus } from '../network';
@@ -15,8 +20,11 @@ export type TranslationRouterOptions = {
   engines: readonly TranslationService[];
   /** Omitted in tests and dev builds; connectivity is then `unknown`. */
   network?: NetworkService;
-  /** Settings preference, read lazily so a change takes effect immediately. */
-  preferOffline?: () => boolean;
+  /**
+   * The user's translation mode, read lazily so a settings change takes effect
+   * on the very next request without rebuilding the router.
+   */
+  mode?: () => TranslationMode;
 };
 
 /**
@@ -39,7 +47,7 @@ export function createTranslationRouter(options: TranslationRouterOptions): Tran
   ): Promise<TranslationService | undefined> {
     const ordered = orderEngines(engines, {
       network: networkStatus,
-      preferOffline: options.preferOffline?.() ?? false,
+      mode: options.mode?.() ?? 'auto',
     });
 
     for (const engine of ordered) {
@@ -54,6 +62,24 @@ export function createTranslationRouter(options: TranslationRouterOptions): Tran
 
   /** What to tell the user when nothing can serve the request. */
   function unavailable(request: TranslationRequest, networkStatus: NetworkStatus) {
+    const mode = options.mode?.() ?? 'auto';
+
+    // The user restricted routing themselves; say so plainly rather than
+    // reporting a generic failure or quietly using the other engine.
+    if (mode === 'offline') {
+      return appError(
+        'model_missing',
+        'On-device translation is selected, but no language pack is installed yet.',
+      );
+    }
+
+    if (mode === 'online' && networkStatus === 'offline') {
+      return appError(
+        'network_unavailable',
+        'Online translation is selected, but there is no connection.',
+      );
+    }
+
     if (networkStatus === 'offline') {
       return appError(
         'network_unavailable',

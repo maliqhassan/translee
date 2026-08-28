@@ -45,6 +45,19 @@ const STUBS = {
       throw new Error('expo-sqlite is unavailable under Node; use createNodeSQLiteDatabase.');
     },
   },
+  /**
+   * Preferences tests drive `createPreferencesService` with an in-memory
+   * storage slot, so the file-backed implementation is never exercised here.
+   */
+  'expo-file-system': {
+    File: class {
+      get exists() {
+        throw new Error('expo-file-system is unavailable under Node.');
+      }
+    },
+    Directory: class {},
+    Paths: { document: {}, cache: {} },
+  },
 };
 
 for (const [name, exports] of Object.entries(STUBS)) {

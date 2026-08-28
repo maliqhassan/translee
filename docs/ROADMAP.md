@@ -117,6 +117,28 @@ verified end to end against the deterministic fake provider.
 History is device-local, never uploaded, and no source or translated text is
 ever logged.
 
+## Day 7 -- Settings and persistent preferences (done)
+
+- Preferences persist to a small JSON document via expo-file-system, behind a
+  `PreferencesStorage` seam. SQLite stays with structured history.
+- Five settings, all wired to real behaviour: source and target language,
+  translation mode, theme and save-history. Settings for capabilities that do
+  not exist yet were removed rather than left as switches that do nothing.
+- The language store still owns the pair at runtime; it hydrates from
+  preferences and writes back using the same Day 3 pure rules.
+- `translationMode` (auto / online / offline) restricts routing literally:
+  choosing on-device with no pack installed returns `model_missing` instead of
+  quietly using the network.
+- `saveHistory` now governs whether a completed translation is recorded.
+- Reset restores the documented defaults and persists them.
+- Stored preferences are validated field by field; anything unusable falls
+  back to its default, and unreadable storage never blocks a launch.
+
+Auto-detection needed no new flag: it is a source language of `auto`, which
+the catalogue, the backend and the provider already support, so persisting the
+source language persists it. Haptics were deferred rather than adding a native
+module for one toggle.
+
 ## Not yet built
 
 Left deliberately for later days, each with its seam already in place:

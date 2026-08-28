@@ -2,6 +2,7 @@
 export const APP = {
   name: 'Transee',
   tagline: 'Translate anywhere, online or off',
+  version: '0.1.0',
 } as const;
 
 /** Keys for persisted values. Namespaced so a stray key can never collide. */

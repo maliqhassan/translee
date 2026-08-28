@@ -1,72 +1,89 @@
-import { createContext, useContext, useMemo, useReducer, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
-import type { ColorSchemeName } from '@/constants';
+import { DEFAULT_PREFERENCES, publishActivePreferences, services } from '@/services';
+import type { AppError, BooleanPreference, Preferences } from '@/types';
 
-export type ThemePreference = ColorSchemeName | 'system';
+/**
+ * The user's persisted settings.
+ *
+ * The store is the runtime source of truth; storage is only where it is kept
+ * between launches. Every change is applied in memory first and written
+ * through afterwards, so a slow or failing write never makes the UI feel
+ * stuck or lose what the user just chose.
+ */
 
-export type Preferences = {
-  theme: ThemePreference;
-  /** Persist translations to the local history database. */
-  saveHistory: boolean;
-  /** Prefer an on-device model even when the network is available. */
-  preferOffline: boolean;
-  /** Speak the result automatically once a translation completes. */
-  autoSpeakResult: boolean;
-  /** Only download language packs over Wi-Fi. */
-  downloadOverWifiOnly: boolean;
-};
-
-const INITIAL: Preferences = {
-  theme: 'system',
-  saveHistory: true,
-  preferOffline: false,
-  autoSpeakResult: false,
-  downloadOverWifiOnly: true,
-};
-
-type Action =
-  | { type: 'set'; key: keyof Preferences; value: Preferences[keyof Preferences] }
-  | { type: 'reset' };
-
-function reducer(state: Preferences, action: Action): Preferences {
-  switch (action.type) {
-    case 'set':
-      return { ...state, [action.key]: action.value };
-    case 'reset':
-      return INITIAL;
-  }
-}
-
-type PreferencesContextValue = {
+export type PreferencesContextValue = {
   preferences: Preferences;
-  setTheme: (theme: ThemePreference) => void;
+  /** Merges a partial change, then persists the whole object. */
+  update: (change: Partial<Preferences>) => void;
   toggle: (key: BooleanPreference) => void;
+  /** Restores the documented defaults and persists them. */
   reset: () => void;
+  /** Set when the last write failed; cleared on the next successful one. */
+  saveError?: AppError;
 };
-
-/** Keys whose value is a boolean — lets `toggle` stay type-safe. */
-export type BooleanPreference = {
-  [K in keyof Preferences]: Preferences[K] extends boolean ? K : never;
-}[keyof Preferences];
 
 const PreferencesContext = createContext<PreferencesContextValue | null>(null);
 
 /**
- * Day 1 keeps preferences in memory only. Persistence is wired in on the
- * storage day by hydrating this reducer from `STORAGE_KEYS.preferences`.
+ * Hydrates from storage before rendering anything.
+ *
+ * Children stay unmounted until preferences are loaded, which keeps the splash
+ * screen up for that moment instead of showing the app with default languages
+ * and then visibly correcting itself. Loading always resolves — unreadable
+ * storage yields defaults — so this can never strand the launch.
  */
 export function PreferencesProvider({ children }: { children: ReactNode }) {
-  const [preferences, dispatch] = useReducer(reducer, INITIAL);
+  const [preferences, setPreferences] = useState<Preferences | null>(null);
+  const [saveError, setSaveError] = useState<AppError | undefined>(undefined);
 
-  const value = useMemo<PreferencesContextValue>(
-    () => ({
-      preferences,
-      setTheme: (theme) => dispatch({ type: 'set', key: 'theme', value: theme }),
-      toggle: (key) => dispatch({ type: 'set', key, value: !preferences[key] }),
-      reset: () => dispatch({ type: 'reset' }),
-    }),
-    [preferences],
-  );
+  useEffect(() => {
+    let active = true;
+
+    void services.preferences.load().then((loaded) => {
+      if (!active) return;
+      // Publish before the first render so the router sees the real mode on
+      // the very first translation.
+      publishActivePreferences(loaded);
+      setPreferences(loaded);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const value = useMemo<PreferencesContextValue>(() => {
+    const current = preferences ?? DEFAULT_PREFERENCES;
+
+    const commit = (next: Preferences) => {
+      setPreferences(next);
+      publishActivePreferences(next);
+
+      void services.preferences.save(next).then((result) => {
+        // The change stays applied either way; the user is only told that it
+        // will not survive a restart.
+        setSaveError(result.ok ? undefined : result.error);
+      });
+    };
+
+    return {
+      preferences: current,
+      saveError,
+      update: (change) => commit({ ...current, ...change }),
+      toggle: (key) => commit({ ...current, [key]: !current[key] }),
+      reset: () => {
+        setPreferences({ ...DEFAULT_PREFERENCES });
+        publishActivePreferences({ ...DEFAULT_PREFERENCES });
+        void services.preferences.reset().then((result) => {
+          setSaveError(result.ok ? undefined : result.error);
+        });
+      },
+    };
+  }, [preferences, saveError]);
+
+  // Nothing renders until the first load resolves.
+  if (!preferences) return null;
 
   return <PreferencesContext.Provider value={value}>{children}</PreferencesContext.Provider>;
 }

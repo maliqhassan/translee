@@ -6,6 +6,11 @@ import { createFetchHttpClient } from './http';
 import { languagePackManager } from './language-packs';
 import { expoNetworkService } from './network';
 import { ocrService } from './ocr';
+import {
+  createFilePreferencesStorage,
+  createPreferencesService,
+  getActiveTranslationMode,
+} from './preferences';
 import { speechService, ttsService } from './speech';
 import {
   createBackendTranslationProvider,
@@ -70,7 +75,12 @@ const translationCache = TRANSLATION_CONFIG.cache.enabled
   : createNullTranslationCache();
 
 const translationRouter = withCache(
-  createTranslationRouter({ engines: translationEngines, network: expoNetworkService }),
+  createTranslationRouter({
+    engines: translationEngines,
+    network: expoNetworkService,
+    // Read per request, so changing the setting takes effect immediately.
+    mode: getActiveTranslationMode,
+  }),
   { cache: translationCache, inFlight: createInFlightRegistry() },
 );
 
@@ -92,6 +102,8 @@ export const services = {
   },
   /** Persistent translation history. Call `initialize()` before querying. */
   history: historyRepository,
+  /** Device-local user settings. */
+  preferences: createPreferencesService(createFilePreferencesStorage()),
   network: expoNetworkService,
   clipboard: expoClipboardService,
   ocr: ocrService,

@@ -3,6 +3,7 @@ export * from './http';
 export * from './language-packs';
 export * from './network';
 export * from './ocr';
+export * from './preferences';
 export * from './service-registry';
 export * from './speech';
 export * from './translation';

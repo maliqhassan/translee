@@ -174,3 +174,28 @@ describe('history survives a restart', () => {
     assert.equal(entries[0]?.translatedText, 'Hallo');
   });
 });
+
+describe('the saveHistory preference', () => {
+  it('writes a record when saving is on', async () => {
+    const { repository, router } = await stack();
+    await translateAndRecord(router, repository, request, { saveHistory: true });
+    await settle();
+    assert.equal(unwrap(await repository.count()), 1);
+  });
+
+  it('writes nothing when the user turned saving off', async () => {
+    const { repository, router } = await stack();
+    const result = await translateAndRecord(router, repository, request, { saveHistory: false });
+    await settle();
+
+    assert.equal(result.ok, true, 'the translation still happens');
+    assert.equal(unwrap(await repository.count()), 0, 'but nothing is recorded');
+  });
+
+  it('defaults to saving when no preference is passed', async () => {
+    const { repository, router } = await stack();
+    await translateAndRecord(router, repository, request);
+    await settle();
+    assert.equal(unwrap(await repository.count()), 1);
+  });
+});

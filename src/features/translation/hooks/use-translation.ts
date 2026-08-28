@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 
 import { services } from '@/services';
-import { useLanguagePair } from '@/store';
+import { useLanguagePair, usePreferences } from '@/store';
 import type { AsyncState, LanguageCode, TranslationResult } from '@/types';
 
 import { translateAndRecord } from '../record-translation';
@@ -34,6 +34,7 @@ const IDLE: AsyncState<TranslationResult> = { status: 'idle' };
  */
 export function useTranslation(): TranslationController {
   const { pair } = useLanguagePair();
+  const { preferences } = usePreferences();
   const [input, setInputState] = useState('');
   const [snapshot, setSnapshot] = useState<Snapshot>({
     source: pair.source,
@@ -79,12 +80,17 @@ export function useTranslation(): TranslationController {
     // Recording happens inside `translateAndRecord` regardless of staleness:
     // the user did perform this translation, so it belongs in history even if
     // they have since typed something else.
-    void translateAndRecord(services.translation.router, services.history, {
-      text,
-      sourceLanguage: source,
-      targetLanguage: target,
-      origin: 'text',
-    }).then((result) => {
+    void translateAndRecord(
+      services.translation.router,
+      services.history,
+      {
+        text,
+        sourceLanguage: source,
+        targetLanguage: target,
+        origin: 'text',
+      },
+      { saveHistory: preferences.saveHistory },
+    ).then((result) => {
       if (id !== requestId.current) return;
 
       settle(
@@ -95,7 +101,7 @@ export function useTranslation(): TranslationController {
         target,
       );
     });
-  }, [input, pair, settle]);
+  }, [input, pair, preferences.saveHistory, settle]);
 
   const reset = useCallback(() => {
     requestId.current += 1;

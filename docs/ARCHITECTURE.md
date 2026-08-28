@@ -150,6 +150,67 @@ translated text, row contents, or query parameters -- statements are logged
 without their bindings. Every query is parameterised; search escapes LIKE
 wildcards so a `%` is searched for rather than matching everything.
 
+## Preferences
+
+Settings are a handful of primitives, so they live in one small JSON document
+rather than the database:
+
+```
+settings screen -> usePreferences -> PreferencesService -> PreferencesStorage
+                                                            -> preferences.json
+```
+
+`PreferencesStorage` is a single named slot of text -- read, write, remove.
+Keeping the seam that narrow means the platform API behind it can change
+without anything above noticing, and tests supply an in-memory slot or a
+deliberately failing one. `file-preferences-storage.ts` is the only file that
+imports expo-file-system.
+
+SQLite stays responsible for structured history; preferences never touch it.
+
+### Hydration and the language pair
+
+`PreferencesProvider` loads before rendering anything, which keeps the splash
+screen up for that moment instead of showing default languages and then
+visibly correcting them. Loading always resolves -- unreadable storage yields
+defaults -- so it can never strand a launch.
+
+The language store stays the runtime source of truth for the pair. It hydrates
+its initial state from preferences and writes back on every change, computing
+the next pair with the same pure rule the reducer uses, so the swap and
+collision rules from Day 3 are never restated. There is no second copy of the
+pair anywhere.
+
+### Translation mode
+
+`auto`, `online` or `offline`, and the router honours the restriction
+literally. Choosing on-device when no pack is installed returns
+`model_missing` rather than quietly using the network -- silently widening a
+restriction the user set would be a lie. The sample engine is exempt from the
+filter, because it stands in for whatever is missing in development and its
+results are always badged `Sample`.
+
+The router reads the mode per request through `getActiveTranslationMode`, so a
+settings change applies to the next translation without rebuilding anything.
+That bridge exists because the router is a plain singleton built at import
+time and cannot use a hook; it mirrors the store and is never a second source
+of truth.
+
+### Corrupt or missing storage
+
+Stored preferences are untrusted input. Every field is validated on its own
+and anything unusable falls back to its default, so a bad value costs that one
+setting rather than the launch. A language is only accepted if the catalogue
+still knows it, and a pair that would be the same on both sides is repaired.
+A failed _write_ is different: the change stays applied in memory and the
+screen says it may not survive a restart.
+
+### Privacy
+
+Preferences are device-local, never uploaded, and never sent to the backend --
+only the language pair and the text travel with a translation request. The
+file contents are never logged.
+
 ## The language catalogue
 
 `constants/language-catalog.ts` is the only place language metadata is
