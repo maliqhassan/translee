@@ -76,14 +76,32 @@ The app never holds a provider credential. It knows one public URL — its own
 backend — and that backend holds the key:
 
 ```
-app  ->  Transee backend  ->  Google / DeepL / Microsoft
-         (holds the key)
+app  ->  Transee backend (server/)  ->  Azure AI Translator
+         holds the credential
 ```
 
+The backend lives in `server/` as its own package: separate dependencies,
+tsconfig and test suite. Backend code never enters the React Native bundle,
+and the app never imports from it.
+
 `EXPO_PUBLIC_*` variables are inlined into the bundle at build time, so only
-non-secret values may go there. `constants/translation-config.ts` is the single
-place client configuration is declared, and a test asserts it carries nothing
-credential-shaped.
+non-secret values may go there — the backend URL and nothing else.
+`constants/translation-config.ts` is the single place client configuration is
+declared, and a test asserts it carries nothing credential-shaped.
+
+### Language identity across the boundary
+
+The app speaks LanguageIds; providers speak their own codes. The mapping is
+generated from the provider's live language endpoint into
+`shared/provider-languages.json` by `scripts/sync-provider-languages.mjs`,
+and both sides read that one file:
+
+- the backend maps id to provider code, and is authoritative
+- the app uses the same table only to fail an unsupported pair instantly,
+  rather than paying for a round trip to be told so
+
+Two catalogue languages have no provider equivalent and correctly return
+`unsupported_language`.
 
 ## The language catalogue
 

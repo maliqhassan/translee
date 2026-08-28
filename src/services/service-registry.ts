@@ -1,4 +1,4 @@
-import { FEATURES, TRANSLATION_CONFIG } from '@/constants';
+import { FEATURES, TRANSLATION_CONFIG, hasBackendConfigured } from '@/constants';
 
 import { expoClipboardService } from './clipboard';
 import { createFetchHttpClient } from './http';
@@ -50,12 +50,17 @@ const onlineTranslationService: TranslationService = backendProvider.isConfigure
   : unconfiguredOnlineTranslationService;
 
 /**
- * Candidate engines. While `FEATURES.mockTranslation` is on, the sample engine
- * is the only candidate — that is what keeps development working without a
- * backend. Turning the flag off hands routing to the real online and offline
- * engines, ordered per request by connectivity.
+ * Candidate engines.
+ *
+ * Configuration decides, not a hand-flipped switch: with no backend URL there
+ * is nothing to call, so the sample engine serves development exactly as it
+ * did before. Set `EXPO_PUBLIC_TRANSEE_API_URL` and the real online engine
+ * takes over, with offline as the second candidate once it exists.
+ * `FEATURES.mockTranslation` forces the sample engine either way.
  */
-const translationEngines: readonly TranslationService[] = FEATURES.mockTranslation
+const useSampleEngine = FEATURES.mockTranslation || !hasBackendConfigured();
+
+const translationEngines: readonly TranslationService[] = useSampleEngine
   ? [mockTranslationService]
   : [onlineTranslationService, offlineTranslationService];
 

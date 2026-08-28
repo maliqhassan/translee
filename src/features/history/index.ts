@@ -1,3 +1,4 @@
+export * from './data/session-history-store';
 export * from './components/history-list-item';
 export * from './components/recent-translation-row';
 export * from './components/recent-translations';

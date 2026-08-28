@@ -75,6 +75,27 @@ No provider API is called and no credential exists in the app. With no backend
 URL configured, the online engine reports itself unavailable and the sample
 engine continues to serve development.
 
+## Day 5 -- Real online translation (done)
+
+- Backend added in `server/`: its own package, dependencies, tsconfig and test
+  suite. It holds the provider credential so the app never has to.
+- Provider: Azure AI Translator. 138 languages, covering 87 of our 89, and it
+  already speaks the script-qualified codes our LanguageIds use.
+- `POST /translation` takes and returns the Transee contract only; no provider
+  field ever reaches the app.
+- `shared/provider-languages.json` is generated from the provider's live
+  language endpoint and read by both sides, so support is decided once.
+- Backend validates types, emptiness, length, body size, language support and
+  same-to-same pairs, and normalises every provider error and status.
+- Fixed-window in-memory rate limiting with `Retry-After`.
+- The registry now picks the engine from configuration: no backend URL means
+  the sample engine, exactly as before; setting one switches to real online.
+- Recent translations are recorded in an in-memory session store, still with
+  no database.
+
+Real provider integration needs a manually supplied Azure key; everything was
+verified end to end against the deterministic fake provider.
+
 ## Not yet built
 
 Left deliberately for later days, each with its seam already in place:

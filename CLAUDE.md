@@ -11,6 +11,7 @@ TypeScript strict.
 - [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md) -- tokens and components
 - [docs/CONVENTIONS.md](docs/CONVENTIONS.md) -- naming, TS strictness, error handling
 - [docs/ROADMAP.md](docs/ROADMAP.md) -- what is built and what is deliberately not
+- [docs/DEVICE_TESTING.md](docs/DEVICE_TESTING.md) -- Expo Go SDK matching, device workflow
 
 ## Rules that matter here
 

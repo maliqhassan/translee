@@ -15,6 +15,6 @@
     "noUnusedParameters": false,
     "skipLibCheck": true
   },
-  "include": ["src/**/*", "tests/**/*"],
-  "exclude": ["node_modules", "dist", ".test-build"]
+  "include": ["src/**/*", "tests/**/*", "shared/**/*.json"],
+  "exclude": ["node_modules", "dist", ".test-build", "server"]
 }

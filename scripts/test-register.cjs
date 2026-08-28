@@ -8,7 +8,10 @@
 const path = require('path');
 const Module = require('module');
 
-const BUILD_ROOT = path.resolve(__dirname, '..', '.test-build', 'src');
+const REPO_ROOT = path.resolve(__dirname, '..');
+const BUILD_ROOT = path.join(REPO_ROOT, '.test-build', 'src');
+/** `@shared/*` resolves to the repo's shared data, not to build output. */
+const SHARED_ROOT = path.join(REPO_ROOT, 'shared');
 
 // `__DEV__` is a Metro global; the logger reads it at module load.
 globalThis.__DEV__ = false;
@@ -42,6 +45,13 @@ for (const [name, exports] of Object.entries(STUBS)) {
 const originalResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...rest) {
   if (Object.prototype.hasOwnProperty.call(STUBS, request)) return `stub:${request}`;
+  if (request.startsWith('@shared/')) {
+    return originalResolve.call(
+      this,
+      path.join(SHARED_ROOT, request.slice('@shared/'.length)),
+      ...rest,
+    );
+  }
   if (request.startsWith('@/')) {
     return originalResolve.call(this, path.join(BUILD_ROOT, request.slice(2)), ...rest);
   }

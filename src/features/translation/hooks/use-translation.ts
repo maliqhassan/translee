@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 
+import { recordTranslation } from '@/features/history';
 import { services } from '@/services';
 import { useLanguagePair } from '@/store';
 import type { AsyncState, LanguageCode, TranslationResult } from '@/types';
@@ -78,6 +79,12 @@ export function useTranslation(): TranslationController {
       .translate({ text, sourceLanguage: source, targetLanguage: target, origin: 'text' })
       .then((result) => {
         if (id !== requestId.current) return;
+        if (result.ok) {
+          // Recent translations read from the session store; a cache replay is
+          // de-duplicated there rather than here.
+          recordTranslation(result.value);
+        }
+
         settle(
           result.ok
             ? { status: 'success', data: result.value }

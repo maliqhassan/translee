@@ -29,10 +29,13 @@ export const DEFAULTS = {
  */
 export const FEATURES = {
   /**
-   * Routes every translation to the in-memory sample engine. Turn off in the
-   * same change that registers a real engine in the service registry.
+   * Forces the in-memory sample engine even when a backend URL is configured.
+   *
+   * Left off because the registry already falls back to the sample engine
+   * whenever no backend is configured. Turn it on to develop against the
+   * sample engine deliberately, with a backend available.
    */
-  mockTranslation: true,
+  mockTranslation: false,
   offlineTranslation: false,
   cameraOcr: false,
   speechInput: false,

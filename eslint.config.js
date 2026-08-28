@@ -7,7 +7,17 @@ module.exports = defineConfig([
   expoConfig,
   prettierConfig,
   {
-    ignores: ['dist/*', 'node_modules/*', '.expo/*', '.test-build/*', 'android/*', 'ios/*'],
+    ignores: [
+      'dist/*',
+      'node_modules/*',
+      '.expo/*',
+      '.test-build/*',
+      'server/dist/*',
+      'server/node_modules/*',
+      'server/.test-build/*',
+      'android/*',
+      'ios/*',
+    ],
   },
   {
     files: ['**/*.{js,jsx,ts,tsx}'],
@@ -28,15 +38,26 @@ module.exports = defineConfig([
   },
   {
     // Build and test tooling runs on Node, not in the app bundle.
-    files: ['scripts/**/*.{js,cjs,mjs}'],
+    files: ['scripts/**/*.{js,cjs,mjs}', 'server/**/*.ts', 'server/**/*.mjs'],
     languageOptions: {
       globals: {
-        __dirname: 'readonly',
         console: 'readonly',
         module: 'writable',
         process: 'readonly',
         require: 'readonly',
+        Buffer: 'readonly',
+        __dirname: 'readonly',
+        fetch: 'readonly',
+        Response: 'readonly',
+        AbortController: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        URL: 'readonly',
       },
+    },
+    rules: {
+      // The backend logs to stdout by design; that is its operational output.
+      'no-console': 'off',
     },
   },
   {

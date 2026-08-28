@@ -42,3 +42,15 @@ yarn-error.*
 
 # unit test build output
 .test-build/
+
+# Local Expo Go APKs downloaded for device testing (very large binaries)
+*.apk
+
+# Backend build and secrets
+server/dist/
+server/.test-build/
+
+# Environment files. Never commit real credentials.
+.env
+.env.local
+.env.*.local

@@ -1,0 +1,20 @@
+{
+  "name": "transee-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "description": "Transee translation backend. Holds the provider credential so the mobile app never has to.",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "node --watch-path=./src --experimental-strip-types src/index.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node scripts/test.mjs",
+    "check": "npm run typecheck && npm run test"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "~6.0.3"
+  }
+}

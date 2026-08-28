@@ -11,9 +11,10 @@
     "verbatimModuleSyntax": true,
     "paths": {
       "@/*": ["./src/*"],
-      "@/assets/*": ["./assets/*"]
+      "@/assets/*": ["./assets/*"],
+      "@shared/*": ["./shared/*"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"],
-  "exclude": ["node_modules", "dist", ".test-build", "tests", "scripts"]
+  "exclude": ["node_modules", "dist", ".test-build", "tests", "scripts", "server"]
 }
