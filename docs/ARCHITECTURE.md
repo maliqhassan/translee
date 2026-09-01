@@ -169,8 +169,34 @@ failed download or load can never be reported as usable.
 The runtime is Google ML Kit, reached through a local Expo native module in
 modules/transee-mlkit. It is resolved optionally, so a build without the native
 module gets an engine that reports itself unavailable rather than one that
-throws. The Kotlin has not yet been compiled on a device.
+throws. The Kotlin now compiles: EAS Cloud built it on Day 12 and the module is in the
+APK. Nothing has been run on a device yet. See the Device testing section of
+OFFLINE_TRANSLATION.md.
 See [OFFLINE_TRANSLATION.md](OFFLINE_TRANSLATION.md).
+
+### Managing models
+
+The packs screen talks to the engine, not to the router: listing, downloading
+and deleting models are not translating, so they are not on the
+`TranslationService` the router speaks. `services.offlineModels` exposes the
+engine for exactly that, and the screen still knows nothing about ML Kit.
+
+Four operations are kept distinct because they mean different things:
+
+| Operation       | What it does                       | Touches the network  |
+| --------------- | ---------------------------------- | -------------------- |
+| `downloadModel` | fetches a model onto the device    | yes, only when asked |
+| `deleteModel`   | removes the files                  | no                   |
+| `loadModel`     | checks the model is really present | **never**            |
+| `unloadModel`   | releases memory, keeps the files   | no                   |
+
+Collapsing download into load is how a translation ends up silently fetching a
+model, which is the one thing offline mode promises not to do. That defect was
+fixed in the Kotlin on Day 10 and in this layer on Day 13.
+
+`toLanguagePacks` turns models into what the screen renders. It has no size
+field at all — not an optional one — so no screen can display a number the
+runtime never reported.
 
 ## Preferences
 

@@ -81,7 +81,32 @@ export type OfflineTranslationEngine = {
   /** Metadata for every model the runtime knows about. */
   listModels(): ServiceResult<OfflineModel[]>;
 
-  /** Brings a model into memory. Must be safe to call when already loaded. */
+  /**
+   * Fetches a model onto the device.
+   *
+   * Separate from `loadModel` on purpose. Downloading is the only operation
+   * here that uses the network, and it must never happen as a side effect of
+   * translating or loading — offline mode promises exactly that it will not.
+   * So it is its own method, called only when a user explicitly asks for it.
+   */
+  downloadModel(modelId: string): ServiceResult<void>;
+
+  /**
+   * Deletes an installed model, reclaiming its space.
+   *
+   * Distinct from `unloadModel`: this removes files, that releases memory. A
+   * runtime with no way to delete must report `not_implemented` rather than
+   * resolve, so a screen never shows a removal that did not happen.
+   */
+  deleteModel(modelId: string): ServiceResult<void>;
+
+  /**
+   * Brings a model into memory. Must be safe to call when already loaded.
+   *
+   * Must **not** download. A model that is not installed makes this fail with
+   * `model_missing`, because loading is on the translation path and the
+   * translation path never reaches the network in offline mode.
+   */
   loadModel(modelId: string): ServiceResult<void>;
 
   /** Releases a model from memory. Leaves it installed on disk. */

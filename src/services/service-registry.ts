@@ -4,7 +4,6 @@ import { TranseeMlKit } from '@modules/transee-mlkit';
 
 import { expoClipboardService } from './clipboard';
 import { createFetchHttpClient } from './http';
-import { languagePackManager } from './language-packs';
 import { expoNetworkService } from './network';
 import { ocrService } from './ocr';
 import {
@@ -73,9 +72,9 @@ const onlineTranslationService: TranslationService = backendProvider.isConfigure
  * so a JS-only bundle or Expo Go gets an engine that reports itself unavailable
  * rather than one that throws. Nothing else in the app changes either way.
  */
-const offlineEngine = createOfflineTranslationService(
-  createMlKitOfflineEngine({ native: TranseeMlKit }),
-);
+const offlineRuntime = createMlKitOfflineEngine({ native: TranseeMlKit });
+
+const offlineEngine = createOfflineTranslationService(offlineRuntime);
 
 const useSampleEngine = FEATURES.mockTranslation || !hasBackendConfigured();
 
@@ -122,7 +121,16 @@ export const services = {
   ocr: ocrService,
   speech: speechService,
   tts: ttsService,
-  languagePacks: languagePackManager,
+  /**
+   * The on-device model runtime, for the language packs screen.
+   *
+   * This is the engine rather than the `TranslationService` wrapper, because
+   * managing models is not translating: the screen needs `listModels`,
+   * `downloadModel` and `deleteModel`, none of which the router's view
+   * exposes. It stays behind `OfflineTranslationEngine`, so the screen still
+   * knows nothing about ML Kit.
+   */
+  offlineModels: offlineRuntime,
 } as const;
 
 export type Services = typeof services;

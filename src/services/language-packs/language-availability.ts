@@ -1,17 +1,25 @@
 import { getLanguage } from '@/constants';
 import type { Language, LanguageId } from '@/types';
 
-import type { LanguagePackStatus } from './language-pack-manager';
-
 /**
  * The seam between static catalogue metadata and runtime pack state.
  *
  * Catalogue metadata (is there a model, what is it called, how big) lives on
- * the `Language`. Install state lives in `LanguagePackManager`. These pure
- * functions combine the two, so the download days can answer "can this run
- * offline?" without a screen ever reasoning about it. Nothing here performs
- * I/O — callers pass in the status they already hold.
+ * the `Language`. What is actually on the device lives in the offline engine's
+ * model registry. These pure functions combine the two, so a screen never
+ * reasons about it. Nothing here performs I/O — callers pass in the status
+ * they already hold.
+ *
+ * Note the deliberate difference from `language-pack.ts`: this describes what
+ * the **catalogue** claims about a language, which is still `supported: false`
+ * everywhere because no device has confirmed a model. `language-pack.ts`
+ * describes what a **runtime** reports it actually has. They are not the same
+ * question and must not be collapsed.
  */
+
+/** Install state of one language's model, as a screen would describe it. */
+export type LanguagePackStatus =
+  'not_installed' | 'queued' | 'downloading' | 'installed' | 'update_available' | 'failed';
 
 /** Canonical pack id for a directed pair, matching `LanguagePack.id`. */
 export function languagePackId(source: LanguageId, target: LanguageId): string {

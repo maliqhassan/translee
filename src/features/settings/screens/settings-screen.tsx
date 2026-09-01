@@ -26,8 +26,9 @@ const MODE_LABELS: Record<TranslationMode, string> = {
 const MODE_HINTS: Record<TranslationMode, string> = {
   auto: 'Use the best engine available',
   online: 'Never use an on-device model',
-  // Said plainly rather than offering a switch that quietly does nothing.
-  offline: 'Not available yet — no language packs',
+  // Describes the rule, not a promise about any particular pair: offline mode
+  // fails with a missing-model error rather than quietly going online.
+  offline: 'Only use downloaded language packs',
 };
 
 /** Steps to the next value in a fixed list, wrapping at the end. */
@@ -126,6 +127,13 @@ export function SettingsScreen() {
                 {MODE_LABELS[preferences.translationMode]}
               </Text>
             }
+          />
+          <Divider inset={theme.spacing.base} />
+          <ListItem
+            icon="cloud-download-outline"
+            title="Language packs"
+            subtitle="Download languages to translate them without a connection"
+            onPress={() => router.push('/settings/language-packs')}
           />
         </Card>
       </View>

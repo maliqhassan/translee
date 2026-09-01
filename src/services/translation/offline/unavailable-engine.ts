@@ -34,6 +34,18 @@ export const unavailableOfflineEngine: OfflineTranslationEngine = {
     return ok([]);
   },
 
+  async downloadModel() {
+    return err(
+      appError('model_missing', 'No on-device translation runtime is installed in this build.'),
+    );
+  },
+
+  async deleteModel() {
+    return err(
+      appError('model_missing', 'No on-device translation runtime is installed in this build.'),
+    );
+  },
+
   async loadModel() {
     return err(
       appError('model_missing', 'No on-device translation runtime is installed in this build.'),

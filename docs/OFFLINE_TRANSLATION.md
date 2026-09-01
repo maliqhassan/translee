@@ -6,7 +6,7 @@ integrated on Day 9.
 
 ## Status
 
-**A real ML Kit integration is written, but it has never been compiled or run.**
+**A real ML Kit integration is written. It has still never been compiled or run.**
 
 Day 9 replaced the placeholder engine with one that drives Google ML Kit
 through a local Expo native module. Every line of TypeScript is tested against
@@ -210,35 +210,153 @@ Represented as absent rather than invented:
 
 ## Device testing
 
-**None was performed.** This machine has JDK 17 but no Android SDK, no adb, no
-Android Studio and no emulator. Nothing was compiled and nothing was run;
-`expo run:android` fails here with "Failed to resolve the Android SDK path".
+**The module compiles and ships in an APK. It has still never been run.**
 
-What _was_ verified without a device:
+Days 10 and 11 could not compile it: this machine has a JDK but no Android SDK,
+no adb, no emulator, no Android Studio and no Gradle. Day 11 re-checked and
+found the same, so rather than install a local toolchain the build moved to
+**EAS Cloud**.
 
-- `npx expo prebuild --platform android` generates the native project
-- `npx expo-modules-autolinking search -p android` **discovers the module**,
-  reads its config, and resolves `expo.modules.transeemlkit.TranseeMlKitModule`
-- the JS bundle still exports cleanly with the module present, because the
-  native module is resolved optionally and degrades to `null`
-- 314 automated tests, including the whole engine driven against a fake native
-  module
+### What the cloud build settled
 
-Still unverified, and only a device can settle it: that the Kotlin compiles,
-that ML Kit translates correctly, which script its `zh` model produces, and how
-large the downloads actually are.
+The first cloud build failed inside Gradle, which no earlier attempt had even
+reached:
 
-On a machine with Android Studio and the SDK installed:
+    A problem occurred configuring project ':transee-mlkit'.
+    > 'android.defaultConfig.versionName' is not defined
 
-    npx expo run:android
+`expo-module-gradle-plugin` registers a Maven publication for every module and
+requires coordinates to build one. Day 10 adopted the plugin correctly but did
+not add them. Every module shipped in the SDK declares `group`, `version` and
+`defaultConfig { versionCode, versionName }`; adding the same four values fixed
+it. This is the third real defect found in this module, and the first that only
+a compiler could have found.
 
-## What Day 10 must do
+The second build succeeded in 18m 36s (568 Gradle tasks). Confirmed from the
+log and by unpacking the artifact:
 
-1. Build and run on a real Android device with the command above.
-2. Confirm the Kotlin compiles and that ML Kit translates end to end.
-3. Observe which script the `zh` model produces and which variant `pt`
-   produces, then decide whether `zh-Hans` and `pt-BR` can be mapped after all.
-4. Measure a real download to replace the undefined `sizeBytes`.
-5. Only then set `offline.supported` on the catalogue entries a device has
-   actually confirmed, with measured sizes.
-6. Build the language-packs screen on top of the engine's model list.
+| Question         | Answer                                                                |
+| ---------------- | --------------------------------------------------------------------- |
+| Autolinked?      | yes, `transee-mlkit (0.1.0)`                                          |
+| Kotlin compiles? | yes, `:transee-mlkit:compileReleaseKotlin`, no errors or warnings     |
+| In the APK?      | yes, `expo.modules.transeemlkit.TranseeMlKitModule` in `classes3.dex` |
+| ML Kit resolved? | yes, `com.google.mlkit.nl.translate` classes packaged alongside it    |
+| Signed?          | yes, APK Signature Scheme v2                                          |
+| Secrets?         | none; no Azure key or auth header in the bundle                       |
+
+Permissions in the release APK, none of them added by this module:
+
+    ACCESS_NETWORK_STATE, ACCESS_WIFI_STATE   expo-network
+    INTERNET                                  expo-file-system
+    READ/WRITE_EXTERNAL_STORAGE               expo-file-system (maxSdkVersion 32)
+    VIBRATE                                   React Native
+    SYSTEM_ALERT_WINDOW                       React Native -- see below
+    DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION  androidx, app-scoped
+
+ML Kit contributed no permission of its own. It registers a JobService for model
+downloads, guarded by the platform's `BIND_JOB_SERVICE`, which is a service
+attribute rather than a permission the app requests.
+
+`SYSTEM_ALERT_WINDOW` ("draw over other apps") is worth noting: it is declared
+in React Native's Android artifact and reaches the release APK from there, not
+from anything in this project. It can be stripped with a `tools:node="remove"`
+entry if we decide it should not ship.
+
+### What is still unverified
+
+Compiling is not translating. Nothing in the list below has been observed, and
+none of it can be until the APK runs on a phone:
+
+- that the native module actually loads at runtime
+- that ML Kit translates anything, in any pair
+- that a model downloads, and how large it really is
+- which script the `zh` model emits and which variant `pt` emits
+- that translation genuinely works with the radio off
+- the model lifecycle on hardware: absent, download, ready, delete
+
+Accordingly `offline.supported`, `sizeBytes` and the 55-of-89 mapping are all
+unchanged.
+
+## Managing packs (Day 13)
+
+A pack is **one language**. Downloading English and German is what makes
+`en -> de` and `de -> en` work; there is no pair to download and no pair
+stored anywhere.
+
+The screen lists what `OfflineTranslationEngine.listModels()` returns, which is
+the 55 catalogue ids ML Kit can serve. States shown are exactly four:
+
+    not downloaded / downloading / downloaded / failed
+
+`downloading` and `failed` are held by the screen, not written back into the
+runtime's view, so an attempt in flight can never be mistaken for a model the
+device actually has. There is **no progress bar**: ML Kit resolves on
+completion and reports no byte count, so a percentage would be invented. There
+is **no size**: the pack type has no size field, which makes displaying one
+impossible rather than merely discouraged.
+
+Four engine operations, kept separate on purpose:
+
+- `downloadModel` -- the only one that uses the network, and only on a tap
+- `deleteModel` -- removes the files
+- `loadModel` -- checks the model is present; **never downloads**
+- `unloadModel` -- releases memory, leaves the files alone
+
+Before Day 13, `loadModel` was implemented as a download and `unloadModel` as
+a delete. The first was the Day 10 defect one layer higher up: anything that
+loaded a model on the translation path would have fetched it over the network.
+
+### Still unverified
+
+Nothing here has run on a phone. Whether `downloadModel` completes, what it
+downloads, how big it is and whether translation then works are open
+questions. The APK from Day 12 proves the module compiles and is packaged --
+not that any of this behaves.
+
+## The offline guarantee
+
+Real network isolation needs a device. The property was proved one level lower
+instead: with `translationMode: 'offline'`, an `HttpClient` spy wired into the
+real online engine records **zero** requests — whether the translation succeeds
+on device, fails with `model_missing`, or is refused as `unsupported_language`.
+A control case in the same suite asserts the spy does record traffic in online
+mode, so a silent no-op cannot pass for a guarantee.
+
+This is the strongest evidence obtainable without hardware. It is **not** the
+same as testing with the radio off, and does not replace it.
+
+## Building it
+
+No local Android toolchain is needed, and none is installed. The build runs in
+EAS Cloud:
+
+    npx eas-cli build --platform android --profile preview
+
+`preview` is an internal-distribution APK: standalone, with the JS bundled in.
+That matters for our purposes -- a development-client build loads its JS from a
+Metro server over the network, which cannot be used to test translation with the
+radio off. The trade is that JS changes need a rebuild rather than a reload.
+
+Because the working tree carries uncommitted changes, the build is invoked with
+`EAS_NO_VCS=1` so the upload reflects the working tree rather than the last
+commit. Without it, EAS would build from committed files and silently miss the
+very fixes being tested.
+
+## What device testing must still do
+
+Everything below needs a phone. The APK exists; none of this has been done.
+
+1. Install the APK and confirm the app starts and the native module resolves
+   rather than degrading to the unavailable engine.
+2. Confirm ML Kit translates: en to de, de to en, en to es, es to fr, and real
+   text in ja to en, ar to en, ur to en.
+3. Exercise the model lifecycle on device: absent, download, ready, repeat
+   translation, delete.
+4. Observe which script the `zh` model emits and which variant `pt` emits, then
+   decide whether `zh-Hans` and `pt-BR` can be mapped. Correctness first --
+   do not widen the mapping to raise the language count.
+5. Measure a real model on disk, distinguishing downloaded model size from APK
+   size, and document how it was measured.
+6. Re-run the offline guarantee with the radio genuinely off.
+7. Then, and only then, set `offline.supported` on the catalogue entries a
+   device has confirmed.

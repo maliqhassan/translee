@@ -7,6 +7,7 @@ import com.google.mlkit.nl.translate.TranslateRemoteModel
 import com.google.mlkit.nl.translate.Translation
 import com.google.mlkit.nl.translate.Translator
 import com.google.mlkit.nl.translate.TranslatorOptions
+import expo.modules.kotlin.Promise
 import expo.modules.kotlin.exception.CodedException
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
@@ -32,7 +33,7 @@ class TranseeMlKitModule : Module() {
   /**
    * Translators are expensive to build and cheap to reuse, so one is kept per
    * source/target pair. `close()` releases the native resources; failing to do
-   * so leaks them, which is why `unloadAll` exists and is called on teardown.
+   * so leaks them, which is why `closeAll` exists and OnDestroy calls it.
    */
   private val translators = ConcurrentHashMap<String, Translator>()
 
@@ -63,7 +64,7 @@ class TranseeMlKitModule : Module() {
      * This is ML Kit's own answer, not a cache of ours: the user can clear app
      * data or Play services can evict a model, and only ML Kit knows.
      */
-    AsyncFunction("getDownloadedLanguages") { promise: expo.modules.kotlin.Promise ->
+    AsyncFunction("getDownloadedLanguages") { promise: Promise ->
       modelManager.getDownloadedModels(TranslateRemoteModel::class.java)
         .addOnSuccessListener { models -> promise.resolve(models.map { it.language }) }
         .addOnFailureListener { error ->
@@ -78,7 +79,7 @@ class TranseeMlKitModule : Module() {
      * percentage available from the API. The TypeScript layer represents that
      * honestly rather than inventing a progress bar.
      */
-    AsyncFunction("downloadModel") { language: String, requireWifi: Boolean, promise: expo.modules.kotlin.Promise ->
+    AsyncFunction("downloadModel") { language: String, requireWifi: Boolean, promise: Promise ->
       val model = TranslateRemoteModel.Builder(language).build()
       val conditions = DownloadConditions.Builder()
         .apply { if (requireWifi) requireWifi() }
@@ -92,7 +93,7 @@ class TranseeMlKitModule : Module() {
     }
 
     /** Deletes a downloaded model, reclaiming its space. */
-    AsyncFunction("deleteModel") { language: String, promise: expo.modules.kotlin.Promise ->
+    AsyncFunction("deleteModel") { language: String, promise: Promise ->
       val model = TranslateRemoteModel.Builder(language).build()
       modelManager.deleteDownloadedModel(model)
         .addOnSuccessListener { promise.resolve(null) }
@@ -102,38 +103,33 @@ class TranseeMlKitModule : Module() {
     }
 
     /**
-     * Translates with models that are already downloaded.
+     * Translates using models that are already on the device.
      *
-     * `requireModelsDownloaded` is what keeps this offline: without it ML Kit
-     * would silently fetch a missing model mid-translation, which would both
-     * surprise the user and defeat the point of the offline mode.
+     * It deliberately does **not** call `downloadModelIfNeeded`: that would fetch
+     * a missing model mid-translation, which is a network call the user did not
+     * ask for and the opposite of what offline mode promises. If a model is
+     * absent the translation simply fails, and downloading stays an explicit
+     * action through `downloadModel`. The TypeScript layer checks both models
+     * first; this is the backstop that makes the guarantee hold even if some
+     * future caller forgets.
      */
-    AsyncFunction("translate") { source: String, target: String, text: String, promise: expo.modules.kotlin.Promise ->
-      val translator = translatorFor(source, target)
-      val conditions = DownloadConditions.Builder().build()
-
-      translator.downloadModelIfNeeded(conditions)
-        .addOnSuccessListener {
-          translator.translate(text)
-            .addOnSuccessListener { translated -> promise.resolve(translated) }
-            .addOnFailureListener { error ->
-              // The message may echo the input, so only the code is passed on.
-              promise.reject(CodedException("translate_failed", error.message, error))
-            }
-        }
+    AsyncFunction("translate") { source: String, target: String, text: String, promise: Promise ->
+      translatorFor(source, target).translate(text)
+        .addOnSuccessListener { translated -> promise.resolve(translated) }
         .addOnFailureListener { error ->
-          promise.reject(CodedException("model_missing", error.message, error))
+          // The message can echo the input, so only the code crosses over.
+          promise.reject(CodedException("translate_failed", error.message, error))
         }
     }
 
     /** Releases one pair's translator. The model stays downloaded. */
-    AsyncFunction("closeTranslator") { source: String, target: String, promise: expo.modules.kotlin.Promise ->
+    AsyncFunction("closeTranslator") { source: String, target: String, promise: Promise ->
       translators.remove(key(source, target))?.close()
       promise.resolve(null)
     }
 
     /** Releases every translator, so native resources are not leaked. */
-    AsyncFunction("closeAll") { promise: expo.modules.kotlin.Promise ->
+    AsyncFunction("closeAll") { promise: Promise ->
       translators.values.forEach { it.close() }
       translators.clear()
       promise.resolve(null)

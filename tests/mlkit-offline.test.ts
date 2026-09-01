@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { LANGUAGES } from '@/constants';
+import type { HttpClient } from '@/services/http/http-client';
 import {
   MLKIT_LANGUAGE_CODES,
   isMlKitSupported,
@@ -14,6 +15,8 @@ import {
   type MlKitNative,
 } from '@/services/translation/offline/mlkit/mlkit-offline-engine';
 import { createOfflineTranslationService } from '@/services/translation/offline-translation-service';
+import { createOnlineTranslationService } from '@/services/translation/online-translation-service';
+import { createBackendTranslationProvider } from '@/services/translation/provider/backend-translation-provider';
 import { createTranslationRouter } from '@/services/translation/translation-router';
 import type { TranslationService } from '@/services/translation/translation-service';
 import type { TranslationMode, TranslationRequest } from '@/types';
@@ -201,7 +204,7 @@ describe('model status and lifecycle', () => {
     const native = fakeNative();
     const engine = createMlKitOfflineEngine({ native });
 
-    assert.equal((await engine.loadModel('mlkit:de')).ok, true);
+    assert.equal((await engine.downloadModel('mlkit:de')).ok, true);
     assert.ok(native.calls.includes('downloadModel:de'));
 
     const models = unwrap(await engine.listModels());
@@ -212,7 +215,7 @@ describe('model status and lifecycle', () => {
     const native = fakeNative(['de']);
     const engine = createMlKitOfflineEngine({ native });
 
-    assert.equal((await engine.unloadModel('mlkit:de')).ok, true);
+    assert.equal((await engine.deleteModel('mlkit:de')).ok, true);
     assert.ok(native.calls.includes('deleteModel:de'));
     assert.equal(native.installed.has('de'), false);
   });
@@ -221,7 +224,7 @@ describe('model status and lifecycle', () => {
     const native = fakeNative();
     const engine = createMlKitOfflineEngine({ native });
 
-    const result = await engine.loadModel('mlkit:zh-Hant');
+    const result = await engine.downloadModel('mlkit:zh-Hant');
     assert.equal(!result.ok && result.error.code, 'unsupported_language');
     assert.equal(native.calls.length, 0, 'nothing should reach the native module');
   });
@@ -232,7 +235,7 @@ describe('model status and lifecycle', () => {
         throw { code: 'model_download_failed', message: 'no network' };
       },
     });
-    const result = await createMlKitOfflineEngine({ native }).loadModel('mlkit:de');
+    const result = await createMlKitOfflineEngine({ native }).downloadModel('mlkit:de');
     assert.equal(!result.ok && result.error.code, 'model_missing');
   });
 
@@ -431,5 +434,113 @@ describe('routing with the real engine', () => {
 
     const result = await router.translate(request);
     assert.equal(result.ok && result.value.engine, 'offline');
+  });
+});
+
+describe('the offline guarantee, proved at the request layer', () => {
+  /**
+   * Network isolation needs a device, which is not available. This proves the
+   * same property one level lower instead: with `translationMode: 'offline'`,
+   * the HTTP client the online engine would use is never called at all.
+   *
+   * It is not a substitute for testing with the radio off — it is the strongest
+   * evidence obtainable without hardware.
+   */
+  function spyingOnlineService() {
+    const sent: string[] = [];
+    const http: HttpClient = {
+      async send(outgoing) {
+        sent.push(outgoing.url);
+        return ok({ status: 200, ok: true, data: { translatedText: 'FROM THE NETWORK' } });
+      },
+    };
+
+    const service = createOnlineTranslationService({
+      provider: createBackendTranslationProvider({
+        baseUrl: 'https://api.example.test',
+        translatePath: '/translation',
+        http,
+      }),
+      network: {
+        id: 'net',
+        isAvailable: async () => true,
+        getStatus: async () => 'online',
+        subscribe: () => () => {},
+      },
+      retry: { maxAttempts: 1, baseDelayMs: 1, maxDelayMs: 1 },
+    });
+
+    return { service, sent };
+  }
+
+  it('sends nothing to the backend when a model is missing', async () => {
+    const online = spyingOnlineService();
+    const router = createTranslationRouter({
+      engines: [
+        online.service,
+        createOfflineTranslationService(createMlKitOfflineEngine({ native: fakeNative([]) })),
+      ],
+      mode: () => 'offline',
+    });
+
+    const result = await router.translate(request);
+
+    assert.equal(!result.ok && result.error.code, 'model_missing');
+    assert.deepEqual(online.sent, [], 'not one request may leave the device');
+  });
+
+  it('sends nothing to the backend when translating on device', async () => {
+    const online = spyingOnlineService();
+    const router = createTranslationRouter({
+      engines: [
+        online.service,
+        createOfflineTranslationService(
+          createMlKitOfflineEngine({ native: fakeNative(['en', 'de']) }),
+        ),
+      ],
+      mode: () => 'offline',
+    });
+
+    const result = await router.translate(request);
+
+    assert.equal(result.ok && result.value.engine, 'offline');
+    assert.equal(result.ok && result.value.translatedText, '[de] Hello');
+    assert.deepEqual(online.sent, [], 'the on-device path must not touch the network');
+  });
+
+  it('sends nothing to the backend for an unsupported language', async () => {
+    const online = spyingOnlineService();
+    const router = createTranslationRouter({
+      engines: [
+        online.service,
+        createOfflineTranslationService(
+          createMlKitOfflineEngine({ native: fakeNative(['en', 'de']) }),
+        ),
+      ],
+      mode: () => 'offline',
+    });
+
+    const result = await router.translate({ ...request, targetLanguage: 'sr' });
+
+    assert.equal(result.ok, false);
+    assert.deepEqual(online.sent, []);
+  });
+
+  it('does reach the backend in online mode, so the spy is known to work', async () => {
+    const online = spyingOnlineService();
+    const router = createTranslationRouter({
+      engines: [
+        online.service,
+        createOfflineTranslationService(
+          createMlKitOfflineEngine({ native: fakeNative(['en', 'de']) }),
+        ),
+      ],
+      mode: () => 'online',
+    });
+
+    const result = await router.translate(request);
+
+    assert.equal(result.ok && result.value.translatedText, 'FROM THE NETWORK');
+    assert.equal(online.sent.length, 1, 'the spy records real traffic');
   });
 });

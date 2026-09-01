@@ -179,6 +179,130 @@ Nothing has been compiled or run: this machine has no Android SDK. Autolinking
 discovers the module and the bundle still exports, but the Kotlin is unverified
 until Day 10 builds it on a real device.
 
+## Day 10 -- Native build attempt (blocked; two real defects fixed)
+
+The goal was to compile, install and test the ML Kit module on a device. The
+environment cannot: there is a JDK, but no Android SDK, no adb, no emulator,
+no Android Studio and no Gradle. `expo run:android` stops at SDK resolution
+and never reaches Kotlin compilation, so **nothing has been compiled or run**.
+
+Static verification found two defects that would each have failed a build:
+
+- the module's `build.gradle` used the pre-SDK-52 style instead of applying
+  `expo-module-gradle-plugin`, which is what every SDK 57 module uses to get
+  its SDK levels, toolchains and core dependency
+- `translate` called `downloadModelIfNeeded`, which fetches a missing model
+  over the network mid-translation -- exactly what offline mode promises not to
+  do, and the comment above it claimed the opposite
+
+Also added: the offline guarantee is now proved at the request layer. In
+offline mode an HttpClient spy records zero requests, with a control case
+showing the spy does record traffic in online mode. That is not the same as
+testing with the radio off.
+
+The language mapping was left at 55 of 89. Widening it needs device evidence,
+not a decision.
+
+## Day 11 -- Native build attempt (blocked again; no Android SDK)
+
+A verification day, not a feature day: compile the Kotlin, run it on a device
+and settle the questions Day 10 left open. The environment was re-checked from
+scratch rather than assumed, in case tooling had been installed since:
+
+| Tool                                  | Status                  |
+| ------------------------------------- | ----------------------- |
+| JDK 17.0.19                           | present                 |
+| ANDROID_HOME / ANDROID_SDK_ROOT       | both unset              |
+| Android SDK on disk                   | none found              |
+| adb, sdkmanager, avdmanager, emulator | none on PATH or on disk |
+| Android Studio                        | not installed           |
+| Gradle                                | absent                  |
+
+Unchanged from Day 10, so the native path stopped there rather than retrying a
+build that cannot resolve an SDK. **No Kotlin has been compiled and nothing has
+run on a device.** Every runtime question stays open: whether the module loads,
+whether ML Kit translates, which script its `zh` model emits, which variant
+`pt` emits, and how large a real model is on disk.
+
+Nothing was changed to manufacture progress. The 55-of-89 language mapping,
+the undefined `sizeBytes`, and `offline.supported` all stay exactly as they
+were, because each needs device evidence. The Day 10 tree was re-verified
+intact: 318 mobile tests, 59 backend tests, typecheck, lint and format all
+clean.
+
+`docs/OFFLINE_TRANSLATION.md` records the exact setup steps that would unblock
+this.
+
+## Day 12 -- Compiled at last, through EAS Cloud
+
+Rather than install Android Studio locally, the build moved to EAS Cloud. The
+project was linked to `@maliqhassan/transee` and an `eas.json` added with an
+internal-distribution APK profile.
+
+The first cloud build reached Gradle and failed there -- which is itself the
+result Days 10 and 11 could not obtain, because nothing had ever got that far:
+
+    A problem occurred configuring project ':transee-mlkit'.
+    > 'android.defaultConfig.versionName' is not defined
+
+A real defect, and one only a compiler could find. Day 10 correctly moved the
+module onto `expo-module-gradle-plugin`, but that plugin registers a Maven
+publication for every module and needs coordinates to do it. Every module
+shipped in the SDK declares `group`, `version` and
+`defaultConfig { versionCode, versionName }`; ours declared none. Adding those
+four values fixed it.
+
+The second build succeeded in 18m 36s. Verified from the build log and by
+unpacking the APK:
+
+- `transee-mlkit (0.1.0)` is autolinked
+- `:transee-mlkit:compileReleaseKotlin` succeeded, with no errors or warnings
+- `expo.modules.transeemlkit.TranseeMlKitModule` is in `classes3.dex`,
+  alongside `com.google.mlkit.nl.translate` -- so the ML Kit dependency
+  resolved and was packaged
+- the APK is signed (APK Signature Scheme v2) and installable
+- eight permissions, none introduced by our module or by ML Kit
+
+**Still nothing has run.** Compiling is not translating. Every runtime question
+Day 11 listed stays open, and `offline.supported`, `sizeBytes` and the 55-of-89
+mapping are all unchanged, pending results from a real phone.
+
+## Day 13 -- Language packs, connected to the real runtime
+
+The first screen that manages on-device models. It lists one row per language
+the runtime says it can serve, with four states: not downloaded, downloading,
+downloaded, failed. Reached from Settings under Translation.
+
+Everything on it comes from the engine's own `listModels()`, so a language
+cannot appear because the catalogue contains it -- only because a runtime
+reported it. That is 55 rows, not 89: `zh-Hans`, `zh-Hant`, `pt-BR`, `pt-PT`,
+`sr` and `mn` are absent, and a test asserts every listed language is one ML
+Kit actually has.
+
+Two defects were fixed on the way:
+
+- **`loadModel` downloaded.** ML Kit's engine implemented "load" as
+  `downloadModel`, so anything on the translation path that loaded a model
+  would have fetched it over the network -- the same defect Day 10 fixed in
+  the Kotlin, still present one layer up. `downloadModel` and `deleteModel`
+  are now their own operations on the engine contract, and `loadModel` checks
+  presence and fails with `model_missing` instead.
+- **`unloadModel` deleted the model**, while the contract said it releases
+  memory and leaves files on disk. A delete button wired to it would have
+  depended on behaviour the interface denied.
+
+The Day 1 `LanguagePackManager` placeholder was removed rather than filled in.
+It modelled packs as **pairs** with a required `sizeBytes: number`, both of
+which are wrong for this runtime: a pair-shaped catalogue would be 55 x 54
+entries describing files that do not exist, and ML Kit reports no sizes. The
+replacement has no size field at all, so a fake number is unrepresentable.
+
+**No device evidence.** The screen has never run on hardware. Whether a
+download actually completes, how long it takes, how large a model really is
+and whether translation then works are all still unverified -- Day 12 compiled
+the module, which is not the same as running it. `offline.supported` in the
+catalogue is still `false` everywhere.
+
 ## Not yet built
 
 Left deliberately for later days, each with its seam already in place:

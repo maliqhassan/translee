@@ -85,6 +85,25 @@ export function createMlKitOfflineEngine(options: MlKitEngineOptions): OfflineTr
     return err(appError('model_missing', 'On-device translation is not available in this build.'));
   }
 
+  /**
+   * Turns a model id into the language and ML Kit code it names.
+   *
+   * Every model operation needs the same two checks — that the id belongs to
+   * this runtime, and that the language is one ML Kit can actually serve — so
+   * they live here rather than being repeated and drifting apart.
+   */
+  function resolve(modelId: string) {
+    const language = modelId.startsWith(`${RUNTIME_ID}:`)
+      ? modelId.slice(RUNTIME_ID.length + 1)
+      : modelId;
+
+    const code = toMlKitCode(language);
+    if (!code || !supportedSet.has(language)) {
+      return err(appError('unsupported_language', `${language} cannot be translated on device.`));
+    }
+    return ok({ language, code });
+  }
+
   /** Downloaded ML Kit codes, mapped back onto catalogue ids. */
   async function downloadedIds(): Promise<LanguageId[] | undefined> {
     if (!native) return undefined;
@@ -149,46 +168,58 @@ export function createMlKitOfflineEngine(options: MlKitEngineOptions): OfflineTr
       );
     },
 
-    async loadModel(modelId: string) {
+    async downloadModel(modelId: string) {
       if (!native) return unavailable();
 
-      const language = modelId.startsWith(`${RUNTIME_ID}:`)
-        ? modelId.slice(RUNTIME_ID.length + 1)
-        : modelId;
-
-      const code = toMlKitCode(language);
-      if (!code || !supportedSet.has(language)) {
-        return err(appError('unsupported_language', `${language} cannot be translated on device.`));
-      }
+      const resolved = resolve(modelId);
+      if (!resolved.ok) return resolved;
 
       try {
-        // "Loading" for ML Kit is ensuring the model is downloaded; it manages
-        // memory residency itself.
-        await native.downloadModel(code, requireWifi);
+        await native.downloadModel(resolved.value.code, requireWifi);
         return ok(undefined);
       } catch (cause) {
-        log.warn(`could not download the model for ${language}`);
+        log.warn(`could not download the model for ${resolved.value.language}`);
         return err(toAppError(cause, 'model_missing'));
       }
     },
 
-    async unloadModel(modelId: string) {
-      if (!native) return ok(undefined);
+    async deleteModel(modelId: string) {
+      if (!native) return unavailable();
 
-      const language = modelId.startsWith(`${RUNTIME_ID}:`)
-        ? modelId.slice(RUNTIME_ID.length + 1)
-        : modelId;
-
-      const code = toMlKitCode(language);
-      if (!code) return ok(undefined);
+      const resolved = resolve(modelId);
+      if (!resolved.ok) return resolved;
 
       try {
-        await native.deleteModel(code);
+        await native.deleteModel(resolved.value.code);
         return ok(undefined);
       } catch (cause) {
-        log.warn(`could not delete the model for ${language}`);
+        log.warn(`could not delete the model for ${resolved.value.language}`);
         return err(toAppError(cause, 'unknown'));
       }
+    },
+
+    async loadModel(modelId: string) {
+      if (!native) return unavailable();
+
+      const resolved = resolve(modelId);
+      if (!resolved.ok) return resolved;
+
+      // Deliberately never downloads. ML Kit owns memory residency, so the
+      // only thing loading can mean here is "is it actually on the device" —
+      // and answering that with a download would put the translation path on
+      // the network, which is the one thing offline mode rules out.
+      const ready = new Set((await downloadedIds()) ?? []);
+      if (!ready.has(resolved.value.language)) {
+        return err(appError('model_missing', 'That language model has not been downloaded yet.'));
+      }
+      return ok(undefined);
+    },
+
+    async unloadModel() {
+      // ML Kit manages model residency itself and exposes no per-language
+      // release, so there is nothing to do rather than something to fake.
+      // Translator handles are closed by the native module on teardown.
+      return ok(undefined);
     },
 
     async translate(request: TranslationRequest): ServiceResult<TranslationResult> {

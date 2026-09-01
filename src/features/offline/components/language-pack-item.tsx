@@ -1,10 +1,9 @@
-import { View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 
-import { Badge, IconButton, ListItem, Text } from '@/components';
-import { getLanguage } from '@/constants';
+import { Badge, IconButton, ListItem } from '@/components';
+import type { BadgeTone } from '@/components';
 import { useTheme } from '@/hooks';
-import type { LanguagePack, LanguagePackStatus } from '@/services';
-import { formatBytes } from '@/utils';
+import type { LanguagePack, LanguagePackState } from '@/services';
 
 export type LanguagePackItemProps = {
   pack: LanguagePack;
@@ -12,59 +11,55 @@ export type LanguagePackItemProps = {
   onRemove?: (pack: LanguagePack) => void;
 };
 
-const STATUS_TONE = {
-  not_installed: 'neutral',
-  queued: 'neutral',
+const STATE_TONE = {
+  not_downloaded: 'neutral',
   downloading: 'primary',
-  installed: 'success',
-  update_available: 'warning',
+  ready: 'success',
   failed: 'danger',
-} as const satisfies Record<LanguagePackStatus, string>;
+} as const satisfies Record<LanguagePackState, BadgeTone>;
 
-const STATUS_LABEL = {
-  not_installed: 'Not installed',
-  queued: 'Queued',
+const STATE_LABEL = {
+  not_downloaded: 'Not downloaded',
   downloading: 'Downloading',
-  installed: 'Installed',
-  update_available: 'Update available',
+  ready: 'Downloaded',
   failed: 'Failed',
-} as const satisfies Record<LanguagePackStatus, string>;
+} as const satisfies Record<LanguagePackState, string>;
 
-/** One downloadable offline model. Download progress is bound in on the packs day. */
+/**
+ * One language's on-device model.
+ *
+ * A pack is a language, not a pair — downloading English and German is what
+ * makes both directions between them work. The subtitle is the endonym rather
+ * than a download size: the runtime does not report sizes, so there is no
+ * number here to show.
+ */
 export function LanguagePackItem({ pack, onDownload, onRemove }: LanguagePackItemProps) {
   const theme = useTheme();
-  const source = getLanguage(pack.source)?.name ?? pack.source;
-  const target = getLanguage(pack.target)?.name ?? pack.target;
-  const installed = pack.status === 'installed';
+  const busy = pack.state === 'downloading';
+  const ready = pack.state === 'ready';
 
   return (
     <ListItem
-      icon="download-outline"
-      title={`${source} → ${target}`}
-      subtitle={formatBytes(pack.sizeBytes)}
+      icon={ready ? 'checkmark-circle-outline' : 'cloud-download-outline'}
+      title={pack.name}
+      subtitle={pack.nativeName}
       showChevron={false}
       trailing={
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
-          <Badge label={STATUS_LABEL[pack.status]} tone={STATUS_TONE[pack.status]} />
-          <IconButton
-            name={installed ? 'trash-outline' : 'cloud-download-outline'}
-            accessibilityLabel={
-              installed ? `Remove ${source} to ${target}` : `Download ${source} to ${target}`
-            }
-            onPress={() => (installed ? onRemove?.(pack) : onDownload?.(pack))}
-          />
+          <Badge label={STATE_LABEL[pack.state]} tone={STATE_TONE[pack.state]} />
+          {busy ? (
+            <ActivityIndicator color={theme.colors.primary} />
+          ) : (
+            <IconButton
+              name={ready ? 'trash-outline' : 'cloud-download-outline'}
+              accessibilityLabel={
+                ready ? `Remove the ${pack.name} pack` : `Download the ${pack.name} pack`
+              }
+              onPress={() => (ready ? onRemove?.(pack) : onDownload?.(pack))}
+            />
+          )}
         </View>
       }
     />
-  );
-}
-
-export type LanguagePackStorageSummaryProps = { usedBytes: number };
-
-export function LanguagePackStorageSummary({ usedBytes }: LanguagePackStorageSummaryProps) {
-  return (
-    <Text variant="bodySmall" color="textSecondary">
-      {formatBytes(usedBytes)} used by installed packs
-    </Text>
   );
 }

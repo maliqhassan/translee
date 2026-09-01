@@ -33,4 +33,10 @@ TypeScript strict.
 8. **Native code lives in `modules/`.** `modules/transee-mlkit` is the only
    Kotlin in the project; it is resolved optionally, so the app still runs
    without a native build.
-9. Run `npm run check` before calling work done.
+9. **Language packs are per language, not per pair.** A pack is one model;
+   both sides of a pair must be downloaded separately. Nothing invents a model
+   size, a checksum or a download percentage — the runtime does not report
+   them, so the fields do not exist.
+10. **Downloading is never a side effect.** Only an explicit user action
+    downloads a model. Translating and loading must never reach the network.
+11. Run `npm run check` before calling work done.
