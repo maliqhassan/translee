@@ -18,8 +18,14 @@ import type { OfflineModel, OfflineModelStatus } from '../translation/offline/of
  * a number we invented.
  */
 
-/** What a pack looks like to a user, collapsed from the model lifecycle. */
-export type LanguagePackState = 'not_downloaded' | 'downloading' | 'ready' | 'failed';
+/**
+ * What a pack looks like to a user, collapsed from the model lifecycle.
+ *
+ * `downloading` and `removing` are distinct because they are opposite actions:
+ * showing "Downloading" while a model is being deleted is a contradiction the
+ * user cannot resolve, and a single busy flag would allow exactly that.
+ */
+export type LanguagePackState = 'not_downloaded' | 'downloading' | 'removing' | 'ready' | 'failed';
 
 export type LanguagePack = {
   /** The runtime's own model id. Download and remove are called with this. */
@@ -58,11 +64,14 @@ export function toPackState(status: OfflineModelStatus): LanguagePackState {
 /**
  * In-flight states the registry cannot know.
  *
- * A download in progress and a download that just failed live in the screen,
- * not on disk, so they are overlaid here rather than written back into the
- * runtime's own view of the world.
+ * Work in progress and a just-failed attempt live in the screen, not on disk,
+ * so they are overlaid rather than written back into the runtime's own view of
+ * the world. Only these three are overlayable: `ready` and `not_downloaded`
+ * are facts about the device and must always come from the runtime.
  */
-export type PackOverrides = Readonly<Record<string, 'downloading' | 'failed'>>;
+export type PackOverride = 'downloading' | 'removing' | 'failed';
+
+export type PackOverrides = Readonly<Record<string, PackOverride>>;
 
 /**
  * Turns runtime models into packs, in catalogue display order.

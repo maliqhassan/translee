@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { FlatList, View } from 'react-native';
 
 import { Card, Divider, EmptyState, IconButton, Screen, ScreenHeader, Text } from '@/components';
+import { errorMessage } from '@/constants';
 import { useTheme } from '@/hooks';
 import type { LanguagePack } from '@/services';
 
@@ -19,7 +20,8 @@ import { useLanguagePacks } from '../hooks/use-language-packs';
 export function LanguagePacksScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { available, loading, packs, error, actionError, download, remove } = useLanguagePacks();
+  const { available, loading, packs, error, actionError, download, remove, dismissActionError } =
+    useLanguagePacks();
 
   const downloaded = packs.filter((pack) => pack.state === 'ready').length;
 
@@ -39,9 +41,16 @@ export function LanguagePacksScreen() {
 
       {actionError ? (
         <Card variant="outlined">
-          <Text variant="bodySmall" color="danger">
-            {actionError.message}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+            <Text variant="bodySmall" color="danger" style={{ flex: 1 }}>
+              {errorMessage(actionError)}
+            </Text>
+            <IconButton
+              name="close-outline"
+              accessibilityLabel="Dismiss this message"
+              onPress={dismissActionError}
+            />
+          </View>
         </Card>
       ) : null}
 

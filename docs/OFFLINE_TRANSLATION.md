@@ -306,6 +306,28 @@ Before Day 13, `loadModel` was implemented as a download and `unloadModel` as
 a delete. The first was the Day 10 defect one layer higher up: anything that
 loaded a model on the translation path would have fetched it over the network.
 
+### Saying why (Day 14)
+
+An error code is not an explanation. `model_missing` is returned for a missing
+source model, a missing target model and an absent runtime, so the screen asks
+a separate question instead of guessing from the code:
+
+```
+offlineReadiness({ runtimeAvailable, supported, downloaded, source, target })
+```
+
+It is pure, does no I/O, and returns one of five answers in the order they can
+be acted on -- runtime first, because no download fixes that; unsupported
+before missing, because offering to download a model that cannot exist is a
+dead end.
+
+Only `packs_missing` offers the packs screen. The others explain and stop.
+
+The notice appears **only in on-device mode**: in automatic and online a
+missing pack is not something the user needs to act on. And only
+`model_missing` and `unsupported_language` are given offline-specific copy, so
+a network timeout never turns into an invitation to download a language pack.
+
 ### Still unverified
 
 Nothing here has run on a phone. Whether `downloadModel` completes, what it
