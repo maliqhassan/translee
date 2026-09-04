@@ -40,7 +40,7 @@ export const FEATURES = {
   offlineTranslation: false,
   cameraOcr: false,
   speechInput: false,
-  textToSpeech: false,
+  textToSpeech: true,
   conversationMode: false,
 } as const;
 

@@ -303,9 +303,77 @@ and whether translation then works are all still unverified -- Day 12 compiled
 the module, which is not the same as running it. `offline.supported` in the
 catalogue is still `false` everywhere.
 
+## Day 14 -- Offline UX made honest
+
+No native change, no new dependency. The work was making the TypeScript side
+explain itself.
+
+`model_missing` was doing too much: it covers a missing source model, a
+missing target model, and a runtime that is not in the build at all -- three
+problems with three different fixes, all of which reached the user as "that
+language pack is not downloaded yet". `offlineReadiness()` now answers the
+question properly, as a pure function of what the runtime reported, and it is
+asked _before_ the user presses Translate rather than after it fails:
+
+    runtime_missing | source_undetectable | unsupported | packs_missing | ready
+
+In on-device mode the translate screen shows what is missing and, when
+downloading would actually help, a button that opens Language Packs. When it
+would not help -- an unsupported language, or no runtime -- no download is
+offered, because a dead end is worse than a plain explanation. Readiness is
+re-checked on focus, so returning from a download does not leave a stale
+notice.
+
+Three defects fixed along the way:
+
+- **Deleting a pack displayed "Downloading".** Both actions set the same busy
+  override. `removing` is now its own state, and the two can no longer be
+  confused.
+- **The packs screen rendered `AppError.message`**, which is log copy by
+  convention. It now maps through `errorMessage` like every other surface.
+- **A double tap could race.** The in-flight guard was read from a state
+  updater, which React does not run until the next render; it is a ref now.
+
+Still nothing has run on hardware. Whether a download completes, how long it
+takes, and whether translation then works remain unverified.
+
+## Day 15 -- Text to speech
+
+The roadmap's remaining seams were Camera OCR, speech to text and text to
+speech. Only the last can be built honestly right now: `expo-speech` is
+first-party, ships inside Expo Go, and needs no config plugin and no native
+build, while the other two would mean new Kotlin and a device to verify it on.
+So the Listen button -- disabled since Day 1, and called out in this table --
+is the one that got wired up.
+
+`createExpoTTSService` is the only file in the app importing `expo-speech`,
+matching the rule that one file owns each platform API; a test asserts that
+stays true. It wraps a fire-and-forget native call so callers get a `Result`
+that settles when the utterance actually ends, which is what a speaking
+indicator needs. Stopping resolves as success rather than as an error, because
+the user asked for it.
+
+The control appears only when two things are both true: `FEATURES.textToSpeech`
+says the capability shipped, and the device reports at least one installed
+voice. A phone with no speech engine gets no button rather than a dead one.
+
+Nothing is invented. Our LanguageIds are already BCP-47 tags, so the language
+is passed straight through with no mapping; `auto` is refused rather than
+guessed; and text longer than the platform's own `maxSpeechInputLength` is
+rejected before the call.
+
+**Speaking is not offline.** Android hands text to whichever TTS engine is
+installed, and some fetch voices over the network. That is the platform's
+behaviour, not ours, and it is why speaking is nowhere described as an offline
+capability. It is also a separate action from translating: offline mode's
+guarantee covers the translation, which has already finished by the time the
+button can be pressed.
+
 ## Not yet built
 
-Left deliberately for later days, each with its seam already in place:
+Camera OCR and speech to text remain. Both need native work and a device to
+verify, so they wait for the deferred device-testing day. The rows below that
+have since shipped are marked accordingly.
 
 | Capability              | Seam waiting for it                            |
 | ----------------------- | ---------------------------------------------- |

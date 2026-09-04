@@ -11,7 +11,7 @@ import {
   createPreferencesService,
   getActiveTranslationMode,
 } from './preferences';
-import { speechService, ttsService } from './speech';
+import { expoTTSService, speechService } from './speech';
 import {
   createBackendTranslationProvider,
   createInFlightRegistry,
@@ -120,7 +120,7 @@ export const services = {
   clipboard: expoClipboardService,
   ocr: ocrService,
   speech: speechService,
-  tts: ttsService,
+  tts: expoTTSService,
   /**
    * The on-device model runtime, for the language packs screen.
    *

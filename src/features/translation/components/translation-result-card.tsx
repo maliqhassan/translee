@@ -4,10 +4,18 @@ import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 
 import { Badge, Button, Card, Icon, IconButton, Skeleton, Spinner, Text } from '@/components';
 import { errorMessage, getLanguage } from '@/constants';
+import type { OfflineNotice } from '@/features/offline';
 import { useTheme } from '@/hooks';
-import type { AsyncState, LanguageCode, TranslationEngine, TranslationResult } from '@/types';
+import type {
+  AppError,
+  AsyncState,
+  LanguageCode,
+  TranslationEngine,
+  TranslationResult,
+} from '@/types';
 
 import type { CopyController } from '../hooks/use-copy-to-clipboard';
+import type { SpeakController } from '../hooks/use-speak';
 
 export type TranslationResultCardProps = {
   state: AsyncState<TranslationResult>;
@@ -15,6 +23,16 @@ export type TranslationResultCardProps = {
   copy: CopyController;
   onClear: () => void;
   onRetry: () => void;
+  /**
+   * Turns an error into offline-specific copy, when the screen knows enough to
+   * be specific. Passed in rather than read here so this component keeps
+   * knowing nothing about engines.
+   */
+  offlineDetail?: (error: AppError) => OfflineNotice | undefined;
+  /** Shown alongside the retry button when the fix is a download. */
+  onOpenPacks?: () => void;
+  /** Absent when the device has no speech engine: the control is then hidden. */
+  speak?: SpeakController;
 };
 
 const ENGINE_BADGE: Record<
@@ -56,6 +74,9 @@ export function TranslationResultCard({
   copy,
   onClear,
   onRetry,
+  offlineDetail,
+  onOpenPacks,
+  speak,
 }: TranslationResultCardProps) {
   const theme = useTheme();
 
@@ -82,6 +103,12 @@ export function TranslationResultCard({
   }
 
   if (state.status === 'error') {
+    // When on-device translation failed because something is missing, say what
+    // and offer the fix. `model_missing` alone cannot distinguish a missing
+    // source model from a missing target model or from no runtime at all, so
+    // the readiness check answers that instead of the error code.
+    const notice = offlineDetail?.(state.error);
+
     return (
       <ResultShell>
         <Animated.View
@@ -95,9 +122,19 @@ export function TranslationResultCard({
             align="center"
             accessibilityLiveRegion="polite"
           >
-            {errorMessage(state.error)}
+            {notice ? notice.description : errorMessage(state.error)}
           </Text>
-          <Button label="Try again" variant="secondary" size="sm" onPress={onRetry} />
+          <View style={{ flexDirection: 'row', gap: theme.spacing.sm }}>
+            {notice?.actionLabel && onOpenPacks ? (
+              <Button
+                label={notice.actionLabel}
+                variant="primary"
+                size="sm"
+                onPress={onOpenPacks}
+              />
+            ) : null}
+            <Button label="Try again" variant="secondary" size="sm" onPress={onRetry} />
+          </View>
         </Animated.View>
       </ResultShell>
     );
@@ -148,11 +185,15 @@ export function TranslationResultCard({
             gap: theme.spacing.xs,
           }}
         >
-          <IconButton
-            name="volume-medium-outline"
-            accessibilityLabel="Read the translation aloud"
-            disabled
-          />
+          {speak?.available ? (
+            <IconButton
+              name={speak.speaking ? 'stop-circle-outline' : 'volume-medium-outline'}
+              accessibilityLabel={
+                speak.speaking ? 'Stop reading aloud' : 'Read the translation aloud'
+              }
+              onPress={() => speak.toggle(result.translatedText, targetLanguage)}
+            />
+          ) : null}
           <IconButton
             name={copy.justCopied ? 'checkmark-circle' : 'copy-outline'}
             accessibilityLabel={copy.justCopied ? 'Translation copied' : 'Copy the translation'}

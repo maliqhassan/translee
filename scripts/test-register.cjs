@@ -40,6 +40,20 @@ const STUBS = {
    * driver: they build the repository over the Node SQLite driver in
    * `tests/support`, so the SQL under test is still run by a real engine.
    */
+  /**
+   * The platform speech engine cannot load under Node. TTS tests drive
+   * `createExpoTTSService` with an injected fake, so this stub only has to
+   * exist for the module-level default binding in the registry.
+   */
+  'expo-speech': {
+    speak: () => {
+      throw new Error('expo-speech is unavailable under Node.');
+    },
+    stop: async () => {},
+    getAvailableVoicesAsync: async () => [],
+    isSpeakingAsync: async () => false,
+    maxSpeechInputLength: 4000,
+  },
   'expo-sqlite': {
     openDatabaseAsync: async () => {
       throw new Error('expo-sqlite is unavailable under Node; use createNodeSQLiteDatabase.');

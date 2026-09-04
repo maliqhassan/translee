@@ -198,6 +198,23 @@ fixed in the Kotlin on Day 10 and in this layer on Day 13.
 field at all — not an optional one — so no screen can display a number the
 runtime never reported.
 
+## Speech
+
+Reading a translation aloud goes through `TTSService`, bound in the registry
+like any other implementation. `expo-tts-service.ts` is the only file importing
+`expo-speech`, the same rule that keeps expo-sqlite in one file and
+expo-clipboard in another.
+
+The native `speak` is fire-and-forget with callbacks; the service turns that
+into a promise that settles on done, stopped or error, so a screen can show a
+speaking state without tracking callbacks itself. Events are also published to
+subscribers for anything that needs the transitions rather than the outcome.
+
+Speaking is deliberately **not** claimed as an offline capability: the platform
+engine may fetch voices over the network. It is a separate action from
+translating and does not touch the offline guarantee, which is about how a
+translation is produced.
+
 ## Preferences
 
 Settings are a handful of primitives, so they live in one small JSON document
