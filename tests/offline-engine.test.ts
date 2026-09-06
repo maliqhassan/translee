@@ -511,13 +511,15 @@ describe('routing with the offline engine', () => {
     assert.equal(result.ok && result.value.translatedText, 'from-offline');
   });
 
-  it('the sample engine still works in every mode', async () => {
-    for (const mode of ['auto', 'online', 'offline'] as TranslationMode[]) {
-      const router = createTranslationRouter({
-        engines: [mockTranslationService],
-        mode: () => mode,
-      });
-      assert.equal((await router.translate(request)).ok, true, `mode ${mode}`);
+  it('the sample engine serves auto, but never a mode the user chose', async () => {
+    const routerIn = (mode: TranslationMode) =>
+      createTranslationRouter({ engines: [mockTranslationService], mode: () => mode });
+
+    assert.equal((await routerIn('auto').translate(request)).ok, true);
+
+    for (const mode of ['online', 'offline'] as TranslationMode[]) {
+      const result = await routerIn(mode).translate(request);
+      assert.equal(result.ok, false, `mode ${mode} must not be served by the sample engine`);
     }
   });
 });

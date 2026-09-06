@@ -30,14 +30,26 @@ export const DEFAULTS = {
  */
 export const FEATURES = {
   /**
-   * Forces the in-memory sample engine even when a backend URL is configured.
+   * Admits the in-memory sample engine as a routing candidate.
    *
-   * Left off because the registry already falls back to the sample engine
-   * whenever no backend is configured. Turn it on to develop against the
-   * sample engine deliberately, with a backend available.
+   * This is now the **only** thing that admits it. Until Day 16 the registry
+   * also swapped the sample engine in whenever no backend URL was configured,
+   * which quietly removed the on-device engine from routing and let a sample
+   * result answer "on-device only". A missing backend is no longer a reason to
+   * use it; turning this on is.
+   *
+   * Even when on, the sample engine ranks behind every real engine and is
+   * eligible only in `auto`, so it can never answer a mode the user chose.
    */
   mockTranslation: false,
-  offlineTranslation: false,
+  /**
+   * On-device translation, over ML Kit. The implementation exists end to end —
+   * engine, model registry, language packs and routing — and the native module
+   * compiles and is packaged by EAS. It has still not been exercised on
+   * hardware, which is why every catalogue entry keeps `offline.supported:
+   * false` until a device confirms a model actually translates.
+   */
+  offlineTranslation: true,
   cameraOcr: false,
   speechInput: false,
   textToSpeech: true,

@@ -1,4 +1,4 @@
-import { FEATURES, TRANSLATION_CONFIG, hasBackendConfigured } from '@/constants';
+import { FEATURES, TRANSLATION_CONFIG } from '@/constants';
 import { createExpoSQLiteDatabase, createHistoryRepository } from '@/database';
 import { TranseeMlKit } from '@modules/transee-mlkit';
 
@@ -57,15 +57,6 @@ const onlineTranslationService: TranslationService = backendProvider.isConfigure
   : unconfiguredOnlineTranslationService;
 
 /**
- * Candidate engines.
- *
- * Configuration decides, not a hand-flipped switch: with no backend URL there
- * is nothing to call, so the sample engine serves development exactly as it
- * did before. Set `EXPO_PUBLIC_TRANSEE_API_URL` and the real online engine
- * takes over, with offline as the second candidate once it exists.
- * `FEATURES.mockTranslation` forces the sample engine either way.
- */
-/**
  * The on-device engine.
  *
  * `TranseeMlKit` is null unless the native module was compiled into this build,
@@ -76,11 +67,30 @@ const offlineRuntime = createMlKitOfflineEngine({ native: TranseeMlKit });
 
 const offlineEngine = createOfflineTranslationService(offlineRuntime);
 
-const useSampleEngine = FEATURES.mockTranslation || !hasBackendConfigured();
-
-const translationEngines: readonly TranslationService[] = useSampleEngine
-  ? [mockTranslationService]
-  : [onlineTranslationService, offlineEngine];
+/**
+ * Candidate engines.
+ *
+ * Both real engines are always candidates. They previously were not: with no
+ * `EXPO_PUBLIC_TRANSEE_API_URL` the list was replaced wholesale by the sample
+ * engine, which quietly removed the on-device engine from routing. A user
+ * could then download language packs, select "on-device only", and receive a
+ * sample translation — the offline engine was never even asked.
+ *
+ * Whether an engine can actually run is each engine's own business:
+ * `unconfiguredOnlineTranslationService` reports unavailable without a backend
+ * URL, and the ML Kit engine reports unavailable without a native build. Being
+ * a candidate is not a claim that it works; it is what lets it answer.
+ *
+ * The sample engine is now opt-in only. `FEATURES.mockTranslation` is the sole
+ * thing that admits it, so a missing backend can no longer turn a development
+ * stand-in into the production engine. `orderEngines` also ranks it behind
+ * every real engine, and it is eligible only in `auto`.
+ */
+const translationEngines: readonly TranslationService[] = [
+  onlineTranslationService,
+  offlineEngine,
+  ...(FEATURES.mockTranslation ? [mockTranslationService] : []),
+];
 
 const translationCache = TRANSLATION_CONFIG.cache.enabled
   ? createMemoryTranslationCache({ maxEntries: TRANSLATION_CONFIG.cache.maxEntries })

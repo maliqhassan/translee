@@ -65,13 +65,26 @@ describe('translation mode shapes the candidate list', () => {
     assert.deepEqual(kinds(ordered), ['offline']);
   });
 
-  it('keeps the sample engine in every mode, since it stands in for what is missing', () => {
-    for (const mode of ['auto', 'online', 'offline'] as TranslationMode[]) {
-      assert.ok(
-        kinds(orderEngines([mock], { network: 'online', mode })).includes('mock'),
-        `mode ${mode}`,
+  it('allows the sample engine only where the user expressed no preference', () => {
+    // Day 16: the sample engine used to be exempt from mode filtering. That let
+    // a sample result satisfy "on-device only", which is a lie a badge does not
+    // excuse. It is eligible in auto and nowhere else.
+    assert.ok(kinds(orderEngines([mock], { network: 'online', mode: 'auto' })).includes('mock'));
+
+    for (const mode of ['online', 'offline'] as TranslationMode[]) {
+      assert.deepEqual(
+        kinds(orderEngines([mock], { network: 'online', mode })),
+        [],
+        `mode ${mode} must not admit the sample engine`,
       );
     }
+  });
+
+  it('never lets the sample engine outrank a real engine', () => {
+    const ordered = kinds(
+      orderEngines([mock, online, offline], { network: 'online', mode: 'auto' }),
+    );
+    assert.equal(ordered[ordered.length - 1], 'mock');
   });
 
   it('still ranks by connectivity within the allowed set', () => {
@@ -139,16 +152,22 @@ describe('the router honours the mode', () => {
     assert.equal(result.ok, true);
   });
 
-  it('keeps the sample engine working in every mode', async () => {
-    for (const mode of ['auto', 'online', 'offline'] as TranslationMode[]) {
-      const router = createTranslationRouter({
-        engines: [mockTranslationService],
-        mode: () => mode,
-      });
-      const result = await router.translate(request);
-      assert.equal(result.ok, true, `mode ${mode} should still translate`);
-      assert.equal(result.ok && result.value.translatedText, 'Hallo');
-    }
+  it('serves the sample engine in auto mode, and refuses it in a chosen mode', async () => {
+    const routerIn = (mode: TranslationMode) =>
+      createTranslationRouter({ engines: [mockTranslationService], mode: () => mode });
+
+    const auto = await routerIn('auto').translate(request);
+    assert.equal(auto.ok, true);
+    assert.equal(auto.ok && auto.value.translatedText, 'Hallo');
+
+    // A user who picked a real mode must not be handed a sample result.
+    const offlineMode = await routerIn('offline').translate(request);
+    assert.equal(offlineMode.ok, false);
+    assert.equal(!offlineMode.ok && offlineMode.error.code, 'model_missing');
+
+    const onlineMode = await routerIn('online').translate(request);
+    assert.equal(onlineMode.ok, false);
+    assert.equal(!onlineMode.ok && onlineMode.error.code, 'service_unavailable');
   });
 
   it('reads the mode per request, so a settings change applies immediately', async () => {

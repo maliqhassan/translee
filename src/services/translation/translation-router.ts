@@ -41,27 +41,44 @@ export function createTranslationRouter(options: TranslationRouterOptions): Tran
     return network ? network.getStatus() : 'unknown';
   }
 
+  /**
+   * The chosen engine, plus whether anything was even available to choose.
+   *
+   * "No engine handles this pair" and "no engine is usable at all" are
+   * different failures with different fixes, and only the second is what a
+   * build with no backend and no native module is suffering from. Reporting
+   * the pair as unsupported there would blame the languages for a
+   * configuration problem.
+   */
   async function pick(
     request: TranslationRequest,
     networkStatus: NetworkStatus,
-  ): Promise<TranslationService | undefined> {
+  ): Promise<{ engine?: TranslationService; anyAvailable: boolean }> {
     const ordered = orderEngines(engines, {
       network: networkStatus,
       mode: options.mode?.() ?? 'auto',
     });
+
+    let anyAvailable = false;
 
     for (const engine of ordered) {
       const [available, supportsPair] = await Promise.all([
         engine.isAvailable(),
         engine.supportsPair(request.sourceLanguage, request.targetLanguage),
       ]);
-      if (available && supportsPair) return engine;
+      if (available) anyAvailable = true;
+      if (available && supportsPair) return { engine, anyAvailable: true };
     }
-    return undefined;
+
+    return { anyAvailable };
   }
 
   /** What to tell the user when nothing can serve the request. */
-  function unavailable(request: TranslationRequest, networkStatus: NetworkStatus) {
+  function unavailable(
+    request: TranslationRequest,
+    networkStatus: NetworkStatus,
+    anyAvailable: boolean,
+  ) {
     const mode = options.mode?.() ?? 'auto';
 
     // The user restricted routing themselves; say so plainly rather than
@@ -86,6 +103,15 @@ export function createTranslationRouter(options: TranslationRouterOptions): Tran
         `Offline, and no on-device model covers ${request.sourceLanguage} to ${request.targetLanguage}.`,
       );
     }
+
+    // Nothing was usable, so the pair was never the problem: this build has no
+    // backend configured and no on-device runtime. Said as a service failure
+    // rather than blaming the languages — and never papered over by handing the
+    // request to a sample engine.
+    if (!anyAvailable) {
+      return appError('service_unavailable', 'No translation engine is available in this build.');
+    }
+
     return appError(
       'unsupported_language',
       `No engine handles ${request.sourceLanguage} to ${request.targetLanguage}.`,
@@ -98,7 +124,7 @@ export function createTranslationRouter(options: TranslationRouterOptions): Tran
       if (!normalized.ok) return normalized;
 
       const networkStatus = await status();
-      const engine = await pick(request, networkStatus);
+      const { engine, anyAvailable } = await pick(request, networkStatus);
 
       if (!engine) {
         log.warn('no engine for request', {
@@ -106,14 +132,14 @@ export function createTranslationRouter(options: TranslationRouterOptions): Tran
           target: request.targetLanguage,
           network: networkStatus,
         });
-        return err(unavailable(request, networkStatus));
+        return err(unavailable(request, networkStatus, anyAvailable));
       }
 
       return engine.translate({ ...request, text: normalized.value.text });
     },
 
     async resolveEngine(request: TranslationRequest): Promise<TranslationEngine> {
-      const engine = await pick(request, await status());
+      const { engine } = await pick(request, await status());
       // Nothing can serve the request; report the engine the UI would have used.
       return engine?.engine ?? 'online';
     },

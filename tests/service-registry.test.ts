@@ -2,6 +2,11 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { TRANSLATION_CONFIG, hasBackendConfigured } from '@/constants/translation-config';
+import {
+  getActivePreferences,
+  publishActivePreferences,
+  resetActivePreferences,
+} from '@/services/preferences/active-preferences';
 import { services } from '@/services/service-registry';
 import type { TranslationRequest } from '@/types';
 
@@ -18,23 +23,71 @@ const request: TranslationRequest = {
 };
 
 describe('service registry', () => {
-  it('keeps the Day 2 mock experience working through the real router', async () => {
+  it('refuses to translate rather than passing off a sample result', async () => {
+    // Day 16. This build has no backend URL and, under Node, no native ML Kit
+    // module, so nothing can serve the request. Before the fix the registry
+    // swapped in the sample engine here and returned "Hallo" as though it were
+    // a translation.
     const result = await services.translation.router.translate(request);
 
-    assert.equal(result.ok, true);
-    if (!result.ok) return;
-    assert.equal(result.value.translatedText, 'Hallo');
-    assert.equal(result.value.engine, 'mock');
+    assert.equal(result.ok, false);
+    assert.equal(!result.ok && result.error.code, 'service_unavailable');
   });
 
-  it('serves a repeat request from the cache', async () => {
+  it('never returns a sample result', async () => {
+    const result = await services.translation.router.translate(request);
+    assert.equal(result.ok && result.value.engine === 'mock', false);
+  });
+
+  it('does not cache a failure, so a later working build is not poisoned', async () => {
     const unique = `Hello ${Date.now()}`;
     const first = await services.translation.router.translate({ ...request, text: unique });
     const second = await services.translation.router.translate({ ...request, text: unique });
 
-    assert.equal(first.ok && second.ok, true);
-    // Same stored object, so the ids match: proof it came from the cache.
-    assert.equal(first.ok && second.ok && first.value.id, second.ok ? second.value.id : '');
+    assert.equal(first.ok, false);
+    assert.equal(second.ok, false);
+    assert.equal(await services.translation.cache.get({ ...request, text: unique }), undefined);
+  });
+
+  it('keeps the offline engine in routing even with no backend configured', async () => {
+    // The defect Day 16 fixed: a missing EXPO_PUBLIC_TRANSEE_API_URL used to
+    // replace the whole candidate list with the sample engine, so the offline
+    // engine was never asked. Selecting on-device mode must now reach it, and
+    // the honest model_missing is proof it did.
+    publishActivePreferences({ ...getActivePreferences(), translationMode: 'offline' });
+
+    try {
+      const result = await services.translation.router.translate(request);
+
+      assert.equal(result.ok, false);
+      assert.equal(!result.ok && result.error.code, 'model_missing');
+    } finally {
+      resetActivePreferences();
+    }
+  });
+
+  it('does not let the sample engine satisfy on-device mode', async () => {
+    publishActivePreferences({ ...getActivePreferences(), translationMode: 'offline' });
+
+    try {
+      const result = await services.translation.router.translate(request);
+      assert.equal(result.ok, false, 'a sample translation must not answer here');
+    } finally {
+      resetActivePreferences();
+    }
+  });
+
+  it('does not let the sample engine satisfy online mode', async () => {
+    publishActivePreferences({ ...getActivePreferences(), translationMode: 'online' });
+
+    try {
+      const result = await services.translation.router.translate(request);
+
+      assert.equal(result.ok, false);
+      assert.equal(!result.ok && result.error.code, 'service_unavailable');
+    } finally {
+      resetActivePreferences();
+    }
   });
 
   it('rejects invalid input before reaching an engine', async () => {
@@ -43,7 +96,11 @@ describe('service registry', () => {
   });
 
   it('reports the engine the UI would badge', async () => {
-    assert.equal(await services.translation.router.resolveEngine(request), 'mock');
+    // Nothing is available in this build, and resolveEngine falls back to the
+    // engine the UI would otherwise have shown. What matters for Day 16 is that
+    // it is no longer the sample engine.
+    const badge = await services.translation.router.resolveEngine(request);
+    assert.notEqual(badge, 'mock');
   });
 
   it('ships with no backend configured, so nothing calls a missing URL', async () => {

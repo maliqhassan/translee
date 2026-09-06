@@ -70,6 +70,28 @@ succeed fails immediately rather than after a round trip. The candidate list is
 built in `service-registry.ts`. `TranslationRouter` is what features depend on;
 `TranslationService` is what engines implement.
 
+### Which engine answers
+
+`orderEngines` decides eligibility and order; the router then takes the first
+candidate whose own `isAvailable` and `supportsPair` both say yes.
+
+Two rules keep that honest, and Day 16 had to restore both:
+
+1. **Every real engine is always a candidate.** The registry lists the online
+   and offline engines unconditionally. Whether either can run is the engine's
+   own answer, not the registry's guess — removing an engine from the list on a
+   configuration signal is how the on-device engine silently stopped being
+   asked.
+2. **A mode the user chose is honoured literally.** `online` admits only online
+   engines, `offline` only offline ones. The sample engine has no exemption: it
+   is eligible in `auto` alone, ranks last, and is admitted only by
+   `FEATURES.mockTranslation`.
+
+When nothing can serve a request the router distinguishes two failures, because
+they have different fixes: no engine _available_ is `service_unavailable` (a
+build with no backend and no native module), while engines available but none
+handling the pair is `unsupported_language`.
+
 ### Keeping the provider key off the device
 
 The app never holds a provider credential. It knows one public URL — its own

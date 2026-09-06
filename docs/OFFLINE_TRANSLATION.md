@@ -6,19 +6,27 @@ integrated on Day 9.
 
 ## Status
 
-**A real ML Kit integration is written. It has still never been compiled or run.**
+**Compiled and packaged. Not verified on hardware.** Those are different
+claims and this document keeps them apart everywhere.
+
+- **Compiled and packaged** — Day 12 built the native module through EAS Cloud.
+  `:transee-mlkit:compileReleaseKotlin` succeeded with no errors, and
+  `expo.modules.transeemlkit.TranseeMlKitModule` is present in the APK's
+  `classes3.dex` alongside the ML Kit translate classes.
+- **Not verified on hardware** — nothing has run. No model has been downloaded,
+  no text translated, no measurement taken. Compiling proves the code is
+  well-formed, not that it works.
 
 Day 9 replaced the placeholder engine with one that drives Google ML Kit
-through a local Expo native module. Every line of TypeScript is tested against
-a fake native module. The Kotlin has not been built, because this machine has
-no Android SDK — see _Device testing_ below for exactly what that leaves
-unverified.
+through a local Expo native module, and every line of TypeScript is tested
+against a fake native module. See _Device testing_ below for exactly what is
+still open.
 
-Until a build exists, `requireOptionalNativeModule` resolves to `null`, the
-engine reports itself unavailable, and offline mode returns `model_missing`
-rather than falling back to the network. The catalogue still reports
-`offline.supported: false` for every language: that flag is set only once a
-device confirms the models work.
+In any build without the native module — Expo Go, or a plain JS bundle —
+`requireOptionalNativeModule` resolves to `null`, the engine reports itself
+unavailable, and offline mode returns `model_missing` rather than falling back
+to the network. The catalogue still reports `offline.supported: false` for
+every language: that flag is set only once a device confirms the models work.
 
 ## The decision
 
@@ -334,6 +342,31 @@ Nothing here has run on a phone. Whether `downloadModel` completes, what it
 downloads, how big it is and whether translation then works are open
 questions. The APK from Day 12 proves the module compiles and is packaged --
 not that any of this behaves.
+
+## Routing (corrected on Day 16)
+
+Being _able_ to translate on device is worthless if the router never asks the
+on-device engine. It did not, in the build that actually shipped.
+
+The registry replaced its whole candidate list with the sample engine whenever
+`EXPO_PUBLIC_TRANSEE_API_URL` was unset — which is the default, and was the
+state of the Day 12 APK. So a user could download English and German, select
+"on-device only", and get a sample result: the offline engine was not in the
+list to be asked. The routing policy compounded it by exempting the sample
+engine from mode filtering, so a stand-in could satisfy a mode the user had
+explicitly chosen. A `Sample` badge is not consent.
+
+Both real engines are now unconditional candidates. Whether either can run is
+each engine's own answer — the online engine reports unavailable without a
+backend URL, the ML Kit engine without a native build — and being a candidate
+is not a claim that it works, only what lets it reply. The sample engine is
+admitted solely by `FEATURES.mockTranslation`, ranks behind every real engine,
+and is eligible only in `auto`.
+
+One consequence is worth stating plainly: a build with no backend and no native
+module now **fails** rather than returning a sample translation. That is the
+point. It reports `service_unavailable` — "no translation engine is available
+in this build" — instead of blaming the language pair.
 
 ## The offline guarantee
 

@@ -37,12 +37,16 @@ function resolveMode(context: RoutingContext): TranslationMode {
  * `offline` and silently getting a network translation would be a lie, and the
  * router reports the honest unavailable error instead.
  *
- * The sample engine is exempt. It is a development stand-in for whichever
- * engine is missing, and its results are always badged `Sample`, so it can
- * never be mistaken for the real thing.
+ * The sample engine used to be exempt from this, on the reasoning that it is a
+ * development stand-in and its results are badged `Sample`. That was safe while
+ * no real offline engine existed and became wrong once one did: it let a sample
+ * result satisfy "on-device only" on a device with the models actually
+ * installed. A badge is not consent. The sample engine is now eligible only in
+ * `auto`, where the user has expressed no preference, and `rank` still places
+ * it behind every real engine.
  */
 function isEligible(engine: TranslationEngine, mode: TranslationMode): boolean {
-  if (engine === 'mock' || mode === 'auto') return true;
+  if (mode === 'auto') return true;
   return engine === mode;
 }
 

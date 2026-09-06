@@ -369,25 +369,70 @@ capability. It is also a separate action from translating: offline mode's
 guarantee covers the translation, which has already finished by the time the
 button can be pressed.
 
+## Day 16 -- Routing corrected: the sample engine stops standing in
+
+A defect, not a feature. Everything built across Days 8 to 15 for on-device
+translation was unreachable in the build that actually shipped.
+
+`service-registry.ts` replaced its entire candidate list with the sample engine
+whenever `EXPO_PUBLIC_TRANSEE_API_URL` was unset -- the default, and the state
+of the Day 12 APK. The offline engine was therefore never a candidate, so
+downloading English and German, selecting "on-device only" and pressing
+Translate returned a **sample** result. `routing-policy.ts` made it worse by
+exempting the sample engine from mode filtering, so a stand-in could satisfy a
+mode the user had explicitly chosen. Day 14's readiness notice, which reads the
+runtime directly rather than the router, would meanwhile report the pair as
+ready -- so the UI asserted readiness while the router served a fake.
+
+Three changes, all small:
+
+- both real engines are now unconditional candidates; an engine's own
+  `isAvailable` decides whether it can run, which is what it was always for
+- the sample engine is admitted only by `FEATURES.mockTranslation`, ranks
+  behind every real engine, and is eligible only in `auto`
+- the router distinguishes "no engine handles this pair" from "no engine is
+  available at all", so an unconfigured build reports `service_unavailable`
+  instead of blaming the languages
+
+The sample engine was demoted, not deleted, as planned.
+
+**This makes the default build fail where it used to appear to work.** With no
+backend configured and no native module, translation now returns
+`service_unavailable` rather than a plausible-looking sample. That is the
+correct behaviour: the previous output was fiction.
+
+Six tests across four files pinned the old behaviour and were rewritten to pin
+the new; none were weakened. A new suite exercises the case none of them
+covered -- the sample engine present _alongside_ the real engines, where
+"correctly refused" can be told apart from "there was nothing else anyway".
+
 ## Not yet built
 
-Camera OCR and speech to text remain. Both need native work and a device to
-verify, so they wait for the deferred device-testing day. The rows below that
-have since shipped are marked accordingly.
+Two capabilities remain, both deferred until the device-testing day because
+each needs new native Kotlin and hardware to verify:
 
-| Capability              | Seam waiting for it                            |
-| ----------------------- | ---------------------------------------------- |
-| Online translation      | `services.translation.online`                  |
-| Offline translation     | `services.translation.offline`                 |
-| Connectivity routing    | the candidate list in `service-registry.ts`    |
-| Language packs          | `services.languagePacks`                       |
-| Camera OCR              | `services.ocr`                                 |
-| Speech to text          | `services.speech`                              |
-| Text to speech          | `services.tts` (the Listen button is disabled) |
-| History persistence     | `useRecentTranslations` + `src/database`       |
-| Preference persistence  | `PreferencesProvider` + `STORAGE_KEYS`         |
-| Full language catalogue | `constants/languages.ts`                       |
+| Capability     | Seam waiting for it | Status                              |
+| -------------- | ------------------- | ----------------------------------- |
+| Camera OCR     | `services.ocr`      | deferred -- needs native + a device |
+| Speech to text | `services.speech`   | deferred -- needs native + a device |
 
-Flip the matching flag in `src/constants/config.ts` when a capability ships.
-Turning off `FEATURES.mockTranslation` restores the real engine order and the
-sample engine can then be deleted.
+Everything else in the original plan has shipped:
+
+| Capability              | Shipped   | Where                                       |
+| ----------------------- | --------- | ------------------------------------------- |
+| Online translation      | Day 5     | `services.translation.online`               |
+| Persistent history      | Day 6     | `src/database` + `useRecentTranslations`    |
+| Preference persistence  | Day 7     | `PreferencesService`                        |
+| Full language catalogue | Day 3     | `constants/languages.ts` (89 languages)     |
+| Offline translation     | Days 8-13 | `services.translation.offline`              |
+| Language packs          | Day 13    | `services.offlineModels`                    |
+| Text to speech          | Day 15    | `services.tts` (the Listen button is live)  |
+| Connectivity routing    | Day 16    | the candidate list in `service-registry.ts` |
+
+Offline translation is shipped in the sense that the code exists, compiles and
+is packaged; it is **not** verified on hardware, and `offline.supported` stays
+`false` across the catalogue until a device says otherwise.
+
+`FEATURES.mockTranslation` is the only switch that admits the sample engine.
+Deleting `mock-translation-service.ts` is possible once a backend is configured
+by default, but until then it is the only way to exercise the app end to end.
