@@ -257,7 +257,10 @@ describe('the wiring around it', () => {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
         const path = `${dir}/${entry.name}`;
         if (entry.isDirectory()) walk(path);
-        else if (/\.tsx?$/.test(entry.name) && readFileSync(path, 'utf8').includes('expo-speech')) {
+        else if (
+          /\.tsx?$/.test(entry.name) &&
+          readFileSync(path, 'utf8').includes("from 'expo-speech'")
+        ) {
           offenders.push(path);
         }
       }

@@ -45,6 +45,25 @@ const STUBS = {
    * `createExpoTTSService` with an injected fake, so this stub only has to
    * exist for the module-level default binding in the registry.
    */
+  /**
+   * The platform recogniser cannot load under Node. Recognition tests drive
+   * `createExpoSpeechRecognitionService` with an injected fake, so this stub
+   * exists only for the module-level default binding in the registry.
+   */
+  'expo-speech-recognition': {
+    ExpoSpeechRecognitionModule: {
+      isRecognitionAvailable: () => false,
+      supportsOnDeviceRecognition: () => false,
+      getPermissionsAsync: async () => ({ granted: false, canAskAgain: true }),
+      requestPermissionsAsync: async () => ({ granted: false, canAskAgain: true }),
+      start: () => {
+        throw new Error('expo-speech-recognition is unavailable under Node.');
+      },
+      stop: () => {},
+      abort: () => {},
+      addListener: () => ({ remove: () => {} }),
+    },
+  },
   'expo-speech': {
     speak: () => {
       throw new Error('expo-speech is unavailable under Node.');

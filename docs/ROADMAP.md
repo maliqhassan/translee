@@ -406,15 +406,49 @@ the new; none were weakened. A new suite exercises the case none of them
 covered -- the sample engine present _alongside_ the real engines, where
 "correctly refused" can be told apart from "there was nothing else anyway".
 
+## Day 17 -- Speech to text
+
+Dictation, over the platform recogniser. Tap the microphone in the composer,
+speak, and the transcript fills the same draft the keyboard writes to. Nothing
+is translated automatically: the user reads it, fixes anything misheard, and
+presses Translate, exactly as with typed text.
+
+`expo-speech-recognition@57.0.0` was added after inspecting it rather than
+trusting it -- the same check Day 9 applied to an ML Kit binding and rejected.
+This one passes: it is a real Expo module (`Module()` + `ModuleDefinition`, so
+New-Architecture native), its Gradle file uses `expo-module-gradle-plugin` with
+the coordinates Day 12 taught us are mandatory, it has zero runtime
+dependencies, it is MIT, and its version tracks SDK 57.
+
+The alternative was writing our own Kotlin wrapper around Android's
+`SpeechRecognizer`, as we did for ML Kit. That was rejected on honesty grounds:
+`transee-mlkit` is a thin call-and-return surface, while `SpeechRecognizer` is
+a stateful lifecycle with partial results, restarts, audio focus and
+package-visibility rules -- a large amount of native code we could not run even
+once. Vendoring a maintained module we can read beats hand-rolling one we
+cannot test.
+
+Its config plugin adds two things to the manifest, both genuinely required:
+`RECORD_AUDIO`, and a `<queries>` entry for `android.speech.RecognitionService`
+without which Android 11+ reports recognition unavailable regardless.
+
+**Not offline.** On most Android devices the recogniser streams audio to Google
+to transcribe it. That is documented rather than glossed over, and it changes
+nothing about the on-device translation guarantee, which is a different
+capability.
+
+**Not verified on hardware.** No one has spoken into it. The permission flow,
+the transcript, the language handling and whether a given device has a
+recogniser at all are open until someone tests the next build.
+
 ## Not yet built
 
-Two capabilities remain, both deferred until the device-testing day because
-each needs new native Kotlin and hardware to verify:
+One capability remains, deferred until the device-testing day because it needs
+new native Kotlin and hardware to verify:
 
-| Capability     | Seam waiting for it | Status                              |
-| -------------- | ------------------- | ----------------------------------- |
-| Camera OCR     | `services.ocr`      | deferred -- needs native + a device |
-| Speech to text | `services.speech`   | deferred -- needs native + a device |
+| Capability | Seam waiting for it | Status                              |
+| ---------- | ------------------- | ----------------------------------- |
+| Camera OCR | `services.ocr`      | deferred -- needs native + a device |
 
 Everything else in the original plan has shipped:
 
@@ -427,6 +461,7 @@ Everything else in the original plan has shipped:
 | Offline translation     | Days 8-13 | `services.translation.offline`              |
 | Language packs          | Day 13    | `services.offlineModels`                    |
 | Text to speech          | Day 15    | `services.tts` (the Listen button is live)  |
+| Speech to text          | Day 17    | `services.speech` (mic in the composer)     |
 | Connectivity routing    | Day 16    | the candidate list in `service-registry.ts` |
 
 Offline translation is shipped in the sense that the code exists, compiles and

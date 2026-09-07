@@ -5,6 +5,8 @@ import { DEFAULTS, getLanguage } from '@/constants';
 import { useResponsive, useTheme } from '@/hooks';
 import type { LanguageCode } from '@/types';
 
+import type { SpeechController } from '../hooks/use-speech-recognition';
+
 export type TranslationComposerProps = {
   value: string;
   onChangeText: (text: string) => void;
@@ -14,6 +16,11 @@ export type TranslationComposerProps = {
   /** Disables editing while a request is in flight. */
   editable?: boolean;
   placeholder?: string;
+  /**
+   * Dictation. Omitted, or reporting itself unavailable, hides the microphone
+   * entirely rather than showing a control that cannot work.
+   */
+  speech?: SpeechController;
 };
 
 const WARNING_AT = Math.floor(DEFAULTS.maxInputLength * DEFAULTS.inputWarningRatio);
@@ -30,6 +37,7 @@ export function TranslationComposer({
   sourceLanguage,
   editable = true,
   placeholder = 'Type something…',
+  speech,
 }: TranslationComposerProps) {
   const theme = useTheme();
   const { isShort } = useResponsive();
@@ -85,14 +93,27 @@ export function TranslationComposer({
           />
         )}
 
-        {hasText ? (
-          <IconButton
-            name="close-circle"
-            size={18}
-            accessibilityLabel="Clear the text"
-            onPress={onClear}
-          />
-        ) : null}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
+          {speech && speech.status !== 'unavailable' ? (
+            <IconButton
+              name={speech.listening ? 'stop-circle' : 'mic-outline'}
+              variant={speech.listening ? 'solid' : 'plain'}
+              accessibilityLabel={
+                speech.listening ? 'Stop listening' : `Dictate in ${languageName}`
+              }
+              onPress={() => speech.toggle(sourceLanguage)}
+            />
+          ) : null}
+
+          {hasText ? (
+            <IconButton
+              name="close-circle"
+              size={18}
+              accessibilityLabel="Clear the text"
+              onPress={onClear}
+            />
+          ) : null}
+        </View>
       </View>
     </Card>
   );

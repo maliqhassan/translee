@@ -1,8 +1,8 @@
 import { useRouter } from 'expo-router';
 import { View } from 'react-native';
 
-import { Button, IconButton, Screen, ScreenHeader } from '@/components';
-import { APP } from '@/constants';
+import { Button, Card, IconButton, Screen, ScreenHeader, Text } from '@/components';
+import { APP, errorMessage } from '@/constants';
 import { RecentTranslations } from '@/features/history';
 import { OfflineReadinessNotice, offlineNotice, useOfflineReadiness } from '@/features/offline';
 import { useTheme } from '@/hooks';
@@ -16,6 +16,7 @@ import { TranslationResultCard } from '../components/translation-result-card';
 import { useCopyToClipboard } from '../hooks/use-copy-to-clipboard';
 import { usePasteFromClipboard } from '../hooks/use-paste-from-clipboard';
 import { useSpeak } from '../hooks/use-speak';
+import { useSpeechRecognition } from '../hooks/use-speech-recognition';
 import { useTranslation } from '../hooks/use-translation';
 
 /**
@@ -35,6 +36,17 @@ export function TranslateScreen() {
   const copy = useCopyToClipboard();
   const paste = usePasteFromClipboard(setInput);
   const speak = useSpeak();
+
+  /**
+   * Dictation writes into the same draft the keyboard does, so the user can
+   * correct a misheard word before translating. Nothing is translated
+   * automatically — pressing Translate stays the user's decision, exactly as
+   * it is for typed text.
+   */
+  const speech = useSpeechRecognition({
+    onPartial: setInput,
+    onFinal: setInput,
+  });
 
   const isTranslating = state.status === 'loading';
 
@@ -93,7 +105,23 @@ export function TranslateScreen() {
           onPaste={paste}
           sourceLanguage={pair.source}
           editable={!isTranslating}
+          speech={speech}
         />
+
+        {speech.error ? (
+          <Card variant="outlined">
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+              <Text variant="bodySmall" color="warning" style={{ flex: 1 }}>
+                {errorMessage(speech.error)}
+              </Text>
+              <IconButton
+                name="close-outline"
+                accessibilityLabel="Dismiss this message"
+                onPress={speech.dismissError}
+              />
+            </View>
+          </Card>
+        ) : null}
 
         <Button
           label="Translate"

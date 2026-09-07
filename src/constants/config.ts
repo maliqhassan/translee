@@ -51,7 +51,12 @@ export const FEATURES = {
    */
   offlineTranslation: true,
   cameraOcr: false,
-  speechInput: false,
+  /**
+   * Dictation, over the platform speech recogniser. Implemented end to end and
+   * compiles, but no device has spoken into it yet — and on most Android
+   * phones recognition streams audio to Google rather than running on device.
+   */
+  speechInput: true,
   textToSpeech: true,
   conversationMode: false,
 } as const;

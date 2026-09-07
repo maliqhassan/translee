@@ -237,6 +237,36 @@ engine may fetch voices over the network. It is a separate action from
 translating and does not touch the offline guarantee, which is about how a
 translation is produced.
 
+## Speech recognition
+
+Dictation goes through `SpeechService`, bound in the registry like any other
+implementation. `expo-speech-recognition-service.ts` is the only file
+importing the package, the same one-file-per-platform-API rule that governs
+expo-sqlite, expo-clipboard and expo-speech; a test walks `src/` and asserts it.
+
+    Translate screen -> useSpeechRecognition -> SpeechService -> platform recogniser
+
+The service turns an imperative native API into the Day 1 seam: `start`,
+`stop`, `cancel` and a subscription carrying `partial`, `final`, `volume`,
+`error` and `end`. Native listeners exist only for the length of a session and
+are removed on `end`, on `cancel`, and on a failed `start`.
+
+**It is not offline.** On Android the recogniser is a system service, usually
+the Google app, and by default it streams audio to Google to transcribe it.
+Some devices support on-device recognition and `supportsOnDeviceRecognition`
+reports whether this one does, but nothing assumes it. This is a separate
+capability from on-device translation and makes no claim on that guarantee.
+
+Permission is requested only from `requestPermission`, which is reached only
+by a microphone tap. Three outcomes are carried by the `Result` itself rather
+than by inspecting a message: `ok(true)` granted, `ok(false)` refused but
+still askable, `err` refused permanently. "Ask again" and "open settings" are
+different instructions and the screen has to tell them apart.
+
+Recognised speech is the user's own words: it is never logged, and native error
+payloads — which can quote what was heard — never cross the boundary. Only a
+coarse code does, mapped to the existing `AppError` codes.
+
 ## Preferences
 
 Settings are a handful of primitives, so they live in one small JSON document
