@@ -9,8 +9,14 @@ export type RecognizedTextBlock = {
   id: string;
   text: string;
   box: BoundingBox;
-  /** 0–1 recognition confidence. */
-  confidence: number;
+  /**
+   * 0–1 recognition confidence, when the recogniser reports one.
+   *
+   * Optional because ML Kit's text recogniser does not expose a confidence for
+   * blocks, lines or elements. The same rule as model sizes applies: a field a
+   * runtime cannot fill is left undefined rather than filled with a guess.
+   */
+  confidence?: number;
 };
 
 export type OCRResult = {

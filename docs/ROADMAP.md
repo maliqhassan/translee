@@ -441,14 +441,45 @@ capability.
 the transcript, the language handling and whether a given device has a
 recogniser at all are open until someone tests the next build.
 
+## Day 18 -- Camera OCR
+
+Point the camera at a menu, tap once, and the text lands in the draft you were
+about to translate. Nothing is translated automatically: scanned text behaves
+exactly like typed and dictated text.
+
+`@react-native-ml-kit/text-recognition` was inspected and rejected for the
+same reasons Day 9 rejected its sibling: `codegenConfig` absent and
+`ReactContextBaseJavaModule` at its core, which is an old-architecture bridge
+module on a New-Architecture-only React Native. Instead the recogniser is a
+second Expo module class inside the `transee-mlkit` project we already build
+and already ship -- `com.google.mlkit:text-recognition:16.0.1`, bundled.
+
+That bundling is the interesting decision. The unbundled play-services variant
+is ~260KB but downloads its model at runtime; the bundled one adds ~4MB per
+architecture and works immediately, offline, with nothing to fetch. For an
+offline-first app that trade is worth taking, and it makes scanning the only
+capability here that is offline without qualification.
+
+`expo-camera` supplies the preview and the shutter. It is first-party, in
+Expo Go, declares `CAMERA` in its own manifest, and needed no `app.json`
+change.
+
+Two things are deliberately absent because ML Kit does not report them: block
+confidence (the seam's field became optional) and a detected language. The
+same rule as model sizes -- a field a runtime cannot fill stays undefined.
+
+Adding the camera sheet also surfaced the project's first literal colours; they
+became `cameraSurface`, `onCamera` and `onCameraMuted` tokens, identical in
+both themes because a live camera feed does not follow the app's theme.
+
+**Not verified on hardware.** No camera has been opened. Whether the preview
+renders, the permission dialog appears, a capture succeeds or any real text is
+recognised are all open until someone tests a build.
+
 ## Not yet built
 
-One capability remains, deferred until the device-testing day because it needs
-new native Kotlin and hardware to verify:
-
-| Capability | Seam waiting for it | Status                              |
-| ---------- | ------------------- | ----------------------------------- |
-| Camera OCR | `services.ocr`      | deferred -- needs native + a device |
+Every capability in the original plan now has an implementation. What remains
+is hardware verification, not code.
 
 Everything else in the original plan has shipped:
 
@@ -462,6 +493,7 @@ Everything else in the original plan has shipped:
 | Language packs          | Day 13    | `services.offlineModels`                    |
 | Text to speech          | Day 15    | `services.tts` (the Listen button is live)  |
 | Speech to text          | Day 17    | `services.speech` (mic in the composer)     |
+| Camera OCR              | Day 18    | `services.ocr` (camera in the composer)     |
 | Connectivity routing    | Day 16    | the candidate list in `service-registry.ts` |
 
 Offline translation is shipped in the sense that the code exists, compiles and

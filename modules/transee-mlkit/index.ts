@@ -22,8 +22,24 @@ export type TranseeMlKitNativeModule = {
   closeAll(): Promise<void>;
 };
 
+/**
+ * Text recognition, a separate module class in the same native project.
+ *
+ * Boxes come back as fractions of the image, so an overlay never needs to know
+ * the capture resolution. Confidence is absent because ML Kit's text
+ * recogniser does not report one.
+ */
+export type TranseeOcrNativeModule = {
+  recognize(uri: string): Promise<{
+    text: string;
+    blocks: { text: string; x: number; y: number; width: number; height: number }[];
+  }>;
+};
+
 /** `null` whenever the native module was not compiled into this build. */
 export const TranseeMlKit = requireOptionalNativeModule<TranseeMlKitNativeModule>('TranseeMlKit');
+
+export const TranseeOcr = requireOptionalNativeModule<TranseeOcrNativeModule>('TranseeOcr');
 
 export function isMlKitModuleAvailable(): boolean {
   return TranseeMlKit !== null;

@@ -237,6 +237,34 @@ engine may fetch voices over the network. It is a separate action from
 translating and does not touch the offline guarantee, which is about how a
 translation is produced.
 
+## Camera OCR
+
+Scanning goes through `OCRService`, bound in the registry like any other
+implementation.
+
+    Translate screen -> useCameraOcr -> OCRService -> TranseeOcr (ML Kit)
+
+Two files own platform APIs and nothing else does: `text-scanner.tsx` is the
+only importer of `expo-camera`, and `service-registry.ts` is the only file
+naming `TranseeOcr`. Tests walk `src/` and assert both.
+
+The recogniser is a **second Expo module class in the existing
+`transee-mlkit` Gradle project** rather than a new module or a fork: same SDK,
+same build, separate capability. Its Latin model is **bundled into the APK**,
+so recognition needs no download, no language pack and no network. That is a
+stronger offline claim than translation (which needs a downloaded model) or
+speech recognition (which usually needs a network), and it holds because the
+model ships inside the binary. The cost is Latin script only.
+
+Boxes cross the boundary as fractions of the image, so an overlay never needs
+the capture resolution. Confidence is absent: ML Kit's text recogniser reports
+none, and the seam marks the field optional rather than inviting a guess.
+`detectedLanguage` is likewise left undefined.
+
+The camera permission is requested only from inside the sheet, which only
+mounts once the user taps scan. A refusal that can be retried and one that
+needs system settings are shown differently, because the instructions differ.
+
 ## Speech recognition
 
 Dictation goes through `SpeechService`, bound in the registry like any other

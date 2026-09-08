@@ -5,6 +5,7 @@ import { DEFAULTS, getLanguage } from '@/constants';
 import { useResponsive, useTheme } from '@/hooks';
 import type { LanguageCode } from '@/types';
 
+import type { CameraOcrController } from '../hooks/use-camera-ocr';
 import type { SpeechController } from '../hooks/use-speech-recognition';
 
 export type TranslationComposerProps = {
@@ -21,6 +22,11 @@ export type TranslationComposerProps = {
    * entirely rather than showing a control that cannot work.
    */
   speech?: SpeechController;
+  /**
+   * Scanning. Omitted, or reporting itself unavailable, hides the camera
+   * control rather than showing one that cannot work.
+   */
+  scan?: CameraOcrController;
 };
 
 const WARNING_AT = Math.floor(DEFAULTS.maxInputLength * DEFAULTS.inputWarningRatio);
@@ -38,6 +44,7 @@ export function TranslationComposer({
   editable = true,
   placeholder = 'Type something…',
   speech,
+  scan,
 }: TranslationComposerProps) {
   const theme = useTheme();
   const { isShort } = useResponsive();
@@ -94,6 +101,14 @@ export function TranslationComposer({
         )}
 
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
+          {scan && scan.status !== 'unavailable' ? (
+            <IconButton
+              name="camera-outline"
+              accessibilityLabel="Scan text with the camera"
+              onPress={scan.open}
+            />
+          ) : null}
+
           {speech && speech.status !== 'unavailable' ? (
             <IconButton
               name={speech.listening ? 'stop-circle' : 'mic-outline'}

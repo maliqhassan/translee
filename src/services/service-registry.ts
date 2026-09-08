@@ -1,11 +1,11 @@
 import { FEATURES, TRANSLATION_CONFIG } from '@/constants';
 import { createExpoSQLiteDatabase, createHistoryRepository } from '@/database';
-import { TranseeMlKit } from '@modules/transee-mlkit';
+import { TranseeMlKit, TranseeOcr } from '@modules/transee-mlkit';
 
 import { expoClipboardService } from './clipboard';
 import { createFetchHttpClient } from './http';
 import { expoNetworkService } from './network';
-import { ocrService } from './ocr';
+import { createMlKitOcrService } from './ocr';
 import {
   createFilePreferencesStorage,
   createPreferencesService,
@@ -68,6 +68,12 @@ const offlineRuntime = createMlKitOfflineEngine({ native: TranseeMlKit });
 const offlineEngine = createOfflineTranslationService(offlineRuntime);
 
 /**
+ * Text recognition. Null native module means a build without the scanner, and
+ * the service reports itself unavailable rather than throwing.
+ */
+const ocrRecognizer = createMlKitOcrService({ native: TranseeOcr });
+
+/**
  * Candidate engines.
  *
  * Both real engines are always candidates. They previously were not: with no
@@ -128,7 +134,7 @@ export const services = {
   preferences: createPreferencesService(createFilePreferencesStorage()),
   network: expoNetworkService,
   clipboard: expoClipboardService,
-  ocr: ocrService,
+  ocr: ocrRecognizer,
   speech: expoSpeechRecognitionService,
   tts: expoTTSService,
   /**

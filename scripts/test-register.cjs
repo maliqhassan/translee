@@ -50,6 +50,17 @@ const STUBS = {
    * `createExpoSpeechRecognitionService` with an injected fake, so this stub
    * exists only for the module-level default binding in the registry.
    */
+  /**
+   * The camera cannot open under Node. Scanner tests drive the OCR service
+   * with an injected fake; this stub exists for the module-level import in
+   * the camera component.
+   */
+  'expo-camera': {
+    CameraView: function CameraView() {
+      throw new Error('expo-camera is unavailable under Node.');
+    },
+    useCameraPermissions: () => [null, async () => ({ granted: false, canAskAgain: true })],
+  },
   'expo-speech-recognition': {
     ExpoSpeechRecognitionModule: {
       isRecognitionAvailable: () => false,

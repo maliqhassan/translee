@@ -27,4 +27,10 @@ dependencies {
   // On-device translation. Models are downloaded through Play services at
   // runtime, so nothing is bundled into the APK and no credential is needed.
   implementation 'com.google.mlkit:translate:17.0.3'
+
+  // On-device text recognition. Unlike translation this model is bundled into
+  // the APK (~4MB per architecture), so scanning works immediately with no
+  // download and no network. Latin script only; the Chinese, Devanagari,
+  // Japanese and Korean recognisers are separate artifacts we do not include.
+  implementation 'com.google.mlkit:text-recognition:16.0.1'
 }

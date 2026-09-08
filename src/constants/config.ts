@@ -50,7 +50,12 @@ export const FEATURES = {
    * false` until a device confirms a model actually translates.
    */
   offlineTranslation: true,
-  cameraOcr: false,
+  /**
+   * Scanning text with the camera, over ML Kit's bundled Latin recogniser.
+   * Implemented end to end and compiles; no device has pointed a camera at
+   * anything yet. Latin script only.
+   */
+  cameraOcr: true,
   /**
    * Dictation, over the platform speech recogniser. Implemented end to end and
    * compiles, but no device has spoken into it yet — and on most Android

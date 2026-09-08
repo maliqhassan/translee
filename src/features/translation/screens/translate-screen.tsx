@@ -3,6 +3,7 @@ import { View } from 'react-native';
 
 import { Button, Card, IconButton, Screen, ScreenHeader, Text } from '@/components';
 import { APP, errorMessage } from '@/constants';
+import { TextScanner } from '@/features/camera';
 import { RecentTranslations } from '@/features/history';
 import { OfflineReadinessNotice, offlineNotice, useOfflineReadiness } from '@/features/offline';
 import { useTheme } from '@/hooks';
@@ -13,6 +14,7 @@ import { BrandMark } from '../components/brand-mark';
 import { LanguageBar } from '../components/language-bar';
 import { TranslationComposer } from '../components/translation-composer';
 import { TranslationResultCard } from '../components/translation-result-card';
+import { useCameraOcr } from '../hooks/use-camera-ocr';
 import { useCopyToClipboard } from '../hooks/use-copy-to-clipboard';
 import { usePasteFromClipboard } from '../hooks/use-paste-from-clipboard';
 import { useSpeak } from '../hooks/use-speak';
@@ -47,6 +49,12 @@ export function TranslateScreen() {
     onPartial: setInput,
     onFinal: setInput,
   });
+
+  /**
+   * Scanned text lands in the same draft as typed and dictated text, and is
+   * translated only when the user presses Translate.
+   */
+  const scan = useCameraOcr(setInput);
 
   const isTranslating = state.status === 'loading';
 
@@ -106,7 +114,23 @@ export function TranslateScreen() {
           sourceLanguage={pair.source}
           editable={!isTranslating}
           speech={speech}
+          scan={scan}
         />
+
+        {scan.error ? (
+          <Card variant="outlined">
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
+              <Text variant="bodySmall" color="warning" style={{ flex: 1 }}>
+                {errorMessage(scan.error)}
+              </Text>
+              <IconButton
+                name="close-outline"
+                accessibilityLabel="Dismiss this message"
+                onPress={scan.dismissError}
+              />
+            </View>
+          </Card>
+        ) : null}
 
         {speech.error ? (
           <Card variant="outlined">
@@ -145,6 +169,13 @@ export function TranslateScreen() {
         offlineDetail={offlineDetail}
         onOpenPacks={() => router.push('/settings/language-packs')}
         speak={speak}
+      />
+
+      <TextScanner
+        visible={scan.scanning}
+        busy={scan.busy}
+        onCapture={scan.capture}
+        onClose={scan.close}
       />
 
       <RecentTranslations />

@@ -15,6 +15,8 @@ export type TextColor = Extract<
   | 'success'
   | 'warning'
   | 'danger'
+  | 'onCamera'
+  | 'onCameraMuted'
 >;
 
 export type TextProps = RNTextProps & {

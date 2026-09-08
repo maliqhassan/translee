@@ -40,6 +40,17 @@ export type ColorTokens = {
 
   /** Backdrop behind modals and full-screen loaders. */
   overlay: string;
+  /**
+   * The camera surface, and what sits on top of it.
+   *
+   * Identical in both themes on purpose: behind these is a live camera feed,
+   * not the app's background, so they do not follow the app's light or dark
+   * setting. Tokens rather than literals so the exception is declared once
+   * here instead of being scattered through a screen.
+   */
+  cameraSurface: string;
+  onCamera: string;
+  onCameraMuted: string;
   /** Skeleton / shimmer base. */
   skeleton: string;
   shadow: string;
@@ -80,6 +91,9 @@ export const lightColors: ColorTokens = {
   dangerMuted: palette.red[100],
 
   overlay: 'rgba(11, 12, 16, 0.45)',
+  cameraSurface: '#000000',
+  onCamera: '#FFFFFF',
+  onCameraMuted: 'rgba(255, 255, 255, 0.4)',
   skeleton: palette.neutral[200],
   shadow: '#0B0C10',
 
@@ -119,6 +133,9 @@ export const darkColors: ColorTokens = {
   dangerMuted: 'rgba(219, 69, 69, 0.16)',
 
   overlay: 'rgba(0, 0, 0, 0.6)',
+  cameraSurface: '#000000',
+  onCamera: '#FFFFFF',
+  onCameraMuted: 'rgba(255, 255, 255, 0.4)',
   skeleton: palette.neutral[800],
   shadow: '#000000',
 
