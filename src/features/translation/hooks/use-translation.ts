@@ -2,13 +2,21 @@ import { useCallback, useRef, useState } from 'react';
 
 import { services } from '@/services';
 import { useLanguagePair, usePreferences } from '@/store';
-import type { AsyncState, LanguageCode, TranslationResult } from '@/types';
+import type { AsyncState, LanguageCode, TranslationResult, TranslationSource } from '@/types';
 
 import { translateAndRecord } from '../record-translation';
 
 export type TranslationController = {
   input: string;
-  setInput: (text: string) => void;
+  /**
+   * Replaces the draft, recording how the text arrived.
+   *
+   * The origin is carried into the request and stored on the history row,
+   * where the list renders a different icon for typed, spoken, scanned and
+   * pasted text. Typing defaults it, so `onChangeText` can be passed straight
+   * through.
+   */
+  setInput: (text: string, origin?: TranslationSource) => void;
   clearInput: () => void;
   state: AsyncState<TranslationResult>;
   /** True when there is something worth sending to an engine. */
@@ -36,6 +44,14 @@ export function useTranslation(): TranslationController {
   const { pair } = useLanguagePair();
   const { preferences } = usePreferences();
   const [input, setInputState] = useState('');
+  /**
+   * How the current draft was produced.
+   *
+   * Reset to `text` whenever the user types, because that is literally what
+   * happened: claiming a translation was dictated when it was hand-corrected
+   * would overstate what we know. Under-claiming is the safer direction.
+   */
+  const [origin, setOrigin] = useState<TranslationSource>('text');
   const [snapshot, setSnapshot] = useState<Snapshot>({
     source: pair.source,
     target: pair.target,
@@ -58,8 +74,9 @@ export function useTranslation(): TranslationController {
   );
 
   const setInput = useCallback(
-    (text: string) => {
+    (text: string, from: TranslationSource = 'text') => {
       setInputState(text);
+      setOrigin(from);
       // Editing supersedes whatever was showing or in flight.
       requestId.current += 1;
       settle(IDLE, pair.source, pair.target);
@@ -87,7 +104,7 @@ export function useTranslation(): TranslationController {
         text,
         sourceLanguage: source,
         targetLanguage: target,
-        origin: 'text',
+        origin,
       },
       { saveHistory: preferences.saveHistory },
     ).then((result) => {
@@ -101,7 +118,7 @@ export function useTranslation(): TranslationController {
         target,
       );
     });
-  }, [input, pair, preferences.saveHistory, settle]);
+  }, [input, origin, pair, preferences.saveHistory, settle]);
 
   const reset = useCallback(() => {
     requestId.current += 1;
@@ -110,6 +127,7 @@ export function useTranslation(): TranslationController {
 
   const clearInput = useCallback(() => {
     setInputState('');
+    setOrigin('text');
     requestId.current += 1;
     settle(IDLE, pair.source, pair.target);
   }, [pair.source, pair.target, settle]);

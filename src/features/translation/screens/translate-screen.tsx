@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { useCallback } from 'react';
 import { View } from 'react-native';
 
 import { Button, Card, IconButton, Screen, ScreenHeader, Text } from '@/components';
@@ -36,7 +37,17 @@ export function TranslateScreen() {
   const { input, setInput, clearInput, state, canTranslate, translate, reset } = useTranslation();
 
   const copy = useCopyToClipboard();
-  const paste = usePasteFromClipboard(setInput);
+
+  /**
+   * Each input route tags the draft with where it came from, so history can
+   * show it. They all land in the same draft and none of them translates on
+   * its own — that stays the user's decision.
+   */
+  const setDictated = useCallback((text: string) => setInput(text, 'voice'), [setInput]);
+  const setScanned = useCallback((text: string) => setInput(text, 'camera'), [setInput]);
+  const setPasted = useCallback((text: string) => setInput(text, 'clipboard'), [setInput]);
+
+  const paste = usePasteFromClipboard(setPasted);
   const speak = useSpeak();
 
   /**
@@ -46,15 +57,15 @@ export function TranslateScreen() {
    * it is for typed text.
    */
   const speech = useSpeechRecognition({
-    onPartial: setInput,
-    onFinal: setInput,
+    onPartial: setDictated,
+    onFinal: setDictated,
   });
 
   /**
    * Scanned text lands in the same draft as typed and dictated text, and is
    * translated only when the user presses Translate.
    */
-  const scan = useCameraOcr(setInput);
+  const scan = useCameraOcr(setScanned);
 
   const isTranslating = state.status === 'loading';
 

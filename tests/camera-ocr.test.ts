@@ -271,9 +271,16 @@ describe('the architecture holds', () => {
     assert.match(composer, /scan\.status !== 'unavailable'/);
   });
 
-  it('writes scanned text into the translation input', () => {
+  it('writes scanned text into the translation input, tagged as scanned', () => {
     const screen = readFileSync('src/features/translation/screens/translate-screen.tsx', 'utf8');
-    assert.match(screen, /useCameraOcr\(setInput\)/);
+
+    // Day 19 routed this through a named setter so history can record that the
+    // text came from the camera. It still lands in the same draft.
+    assert.match(screen, /useCameraOcr\(setScanned\)/);
+    assert.match(
+      screen,
+      /setScanned = useCallback\(\(text: string\) => setInput\(text, 'camera'\)/,
+    );
   });
 
   it('does not translate automatically after a scan', () => {

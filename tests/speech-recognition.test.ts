@@ -470,11 +470,17 @@ describe('the microphone is wired, not decorative', () => {
     assert.match(composer, /speech\.status !== 'unavailable'/);
   });
 
-  it('writes recognised text into the translation input', () => {
+  it('writes recognised text into the translation input, tagged as spoken', () => {
     const screen = readFileSync('src/features/translation/screens/translate-screen.tsx', 'utf8');
 
-    assert.match(screen, /onPartial: setInput/);
-    assert.match(screen, /onFinal: setInput/);
+    // Day 19 routed this through a named setter so history can record that the
+    // text was dictated. It still lands in the same draft.
+    assert.match(screen, /onPartial: setDictated/);
+    assert.match(screen, /onFinal: setDictated/);
+    assert.match(
+      screen,
+      /setDictated = useCallback\(\(text: string\) => setInput\(text, 'voice'\)/,
+    );
   });
 
   it('does not translate automatically after dictation', () => {
