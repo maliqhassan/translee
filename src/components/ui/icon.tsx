@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { ComponentProps } from 'react';
 
-import type { ColorTokens } from '@/constants';
+import { resolveInk, type ColorTokens } from '@/constants';
 import { useTheme } from '@/hooks';
 
 export type IconName = ComponentProps<typeof Ionicons>['name'];
@@ -18,5 +18,5 @@ export type IconProps = {
  */
 export function Icon({ name, size = 20, color = 'text' }: IconProps) {
   const theme = useTheme();
-  return <Ionicons name={name} size={size} color={theme.colors[color]} />;
+  return <Ionicons name={name} size={size} color={resolveInk(theme, color)} />;
 }

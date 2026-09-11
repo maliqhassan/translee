@@ -3,17 +3,22 @@ import { View } from 'react-native';
 import { Button, Card, IconButton, Input, Text } from '@/components';
 import { DEFAULTS, getLanguage } from '@/constants';
 import { useResponsive, useTheme } from '@/hooks';
-import type { LanguageCode } from '@/types';
+import type { LanguageField } from '@/store';
+import type { LanguageId } from '@/types';
 
 import type { CameraOcrController } from '../hooks/use-camera-ocr';
 import type { SpeechController } from '../hooks/use-speech-recognition';
+
+import { LanguagePanelHeader } from './language-panel-header';
 
 export type TranslationComposerProps = {
   value: string;
   onChangeText: (text: string) => void;
   onClear: () => void;
   onPaste: () => void;
-  sourceLanguage: LanguageCode;
+  sourceLanguage: LanguageId;
+  /** Opens the picker for one side of the pair. */
+  onSelectLanguage: (field: LanguageField) => void;
   /** Disables editing while a request is in flight. */
   editable?: boolean;
   placeholder?: string;
@@ -24,7 +29,8 @@ export type TranslationComposerProps = {
   speech?: SpeechController;
   /**
    * Scanning. Omitted, or reporting itself unavailable, hides the camera
-   * control rather than showing one that cannot work.
+   * control rather than showing one that cannot work. Reporting itself locked
+   * shows the same action wearing a lock, which leads to the upgrade screen.
    */
   scan?: CameraOcrController;
 };
@@ -32,8 +38,14 @@ export type TranslationComposerProps = {
 const WARNING_AT = Math.floor(DEFAULTS.maxInputLength * DEFAULTS.inputWarningRatio);
 
 /**
- * The text entry surface on the translate screen. Presentational: it reports
- * changes upward and holds no draft state of its own.
+ * The source panel: which language, the text, and the ways of getting text in.
+ *
+ * The three input routes are given equal, *labelled* billing in a row of their
+ * own. Scanning in particular used to be a bare icon in a crowded toolbar,
+ * which made the app's most distinctive input look like an afterthought; it is
+ * now a named action a user can find without guessing what the glyph means.
+ *
+ * Presentational: it reports changes upward and holds no draft state.
  */
 export function TranslationComposer({
   value,
@@ -41,8 +53,9 @@ export function TranslationComposer({
   onClear,
   onPaste,
   sourceLanguage,
+  onSelectLanguage,
   editable = true,
-  placeholder = 'Type something…',
+  placeholder = 'Type, scan or speak…',
   speech,
   scan,
 }: TranslationComposerProps) {
@@ -53,8 +66,36 @@ export function TranslationComposer({
   const nearLimit = value.length >= WARNING_AT;
   const languageName = getLanguage(sourceLanguage)?.name ?? sourceLanguage;
 
+  /*
+   * Two different reasons the control changes, kept apart deliberately.
+   *
+   * `unavailable` means this build or this device cannot scan, and the action
+   * disappears entirely — there is nothing to offer. `locked` means it would
+   * work here, so the action stays visible and says why it is not running.
+   * The component makes neither judgement itself; it reads the controller.
+   */
+  const canScan = scan && scan.status !== 'unavailable';
+  const scanLocked = scan?.status === 'locked';
+  const canSpeak = speech && speech.status !== 'unavailable';
+
   return (
     <Card variant="outlined" padding="md" style={{ gap: theme.spacing.xs }}>
+      <LanguagePanelHeader
+        field="source"
+        id={sourceLanguage}
+        onPress={() => onSelectLanguage('source')}
+        actions={
+          hasText ? (
+            <IconButton
+              name="close-circle"
+              size={18}
+              accessibilityLabel="Clear the text"
+              onPress={onClear}
+            />
+          ) : null
+        }
+      />
+
       <Input
         value={value}
         onChangeText={onChangeText}
@@ -68,18 +109,65 @@ export function TranslationComposer({
         accessibilityLabel={`Text to translate, in ${languageName}`}
         accessibilityHint="Enter the text you want translated"
         // Short devices give the keyboard room; taller ones get a roomier field.
-        inputStyle={{ minHeight: isShort ? 92 : 128 }}
+        inputStyle={{ minHeight: isShort ? 84 : 116 }}
       />
 
       <View
         style={{
           flexDirection: 'row',
           alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: theme.spacing.sm,
+          gap: theme.spacing.xs,
           minHeight: theme.layout.minTouchTarget,
         }}
       >
+        {canScan ? (
+          scanLocked ? (
+            <Button
+              label="Scan"
+              icon="lock-closed-outline"
+              variant="ghost"
+              size="sm"
+              onPress={scan.upgrade}
+              accessibilityHint="Camera text recognition is part of Transee Pro"
+              style={{ paddingHorizontal: theme.spacing.md }}
+            />
+          ) : (
+            <Button
+              label="Scan"
+              icon="camera-outline"
+              variant="secondary"
+              size="sm"
+              onPress={scan.open}
+              accessibilityHint="Opens the camera to read text from a picture"
+              style={{ paddingHorizontal: theme.spacing.md }}
+            />
+          )
+        ) : null}
+
+        {canSpeak ? (
+          <Button
+            label={speech.listening ? 'Stop' : 'Speak'}
+            icon={speech.listening ? 'stop-circle' : 'mic-outline'}
+            variant={speech.listening ? 'primary' : 'secondary'}
+            size="sm"
+            onPress={() => speech.toggle(sourceLanguage)}
+            accessibilityHint="Dictates in the source language"
+            style={{ paddingHorizontal: theme.spacing.md }}
+          />
+        ) : null}
+
+        <Button
+          label="Paste"
+          icon="clipboard-outline"
+          variant="ghost"
+          size="sm"
+          onPress={onPaste}
+          accessibilityHint="Pastes text from the clipboard"
+          style={{ paddingHorizontal: theme.spacing.sm }}
+        />
+
+        <View style={{ flex: 1 }} />
+
         {hasText ? (
           <Text
             variant="caption"
@@ -88,47 +176,7 @@ export function TranslationComposer({
           >
             {value.length} / {DEFAULTS.maxInputLength}
           </Text>
-        ) : (
-          <Button
-            label="Paste"
-            icon="clipboard-outline"
-            variant="ghost"
-            size="sm"
-            onPress={onPaste}
-            accessibilityHint="Pastes text from the clipboard"
-            style={{ paddingHorizontal: theme.spacing.xs }}
-          />
-        )}
-
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.xs }}>
-          {scan && scan.status !== 'unavailable' ? (
-            <IconButton
-              name="camera-outline"
-              accessibilityLabel="Scan text with the camera"
-              onPress={scan.open}
-            />
-          ) : null}
-
-          {speech && speech.status !== 'unavailable' ? (
-            <IconButton
-              name={speech.listening ? 'stop-circle' : 'mic-outline'}
-              variant={speech.listening ? 'solid' : 'plain'}
-              accessibilityLabel={
-                speech.listening ? 'Stop listening' : `Dictate in ${languageName}`
-              }
-              onPress={() => speech.toggle(sourceLanguage)}
-            />
-          ) : null}
-
-          {hasText ? (
-            <IconButton
-              name="close-circle"
-              size={18}
-              accessibilityLabel="Clear the text"
-              onPress={onClear}
-            />
-          ) : null}
-        </View>
+        ) : null}
       </View>
     </Card>
   );

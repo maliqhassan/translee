@@ -1,8 +1,13 @@
-import { FEATURES, TRANSLATION_CONFIG } from '@/constants';
+import { FEATURES, STORAGE_KEYS, TRANSLATION_CONFIG } from '@/constants';
 import { createExpoSQLiteDatabase, createHistoryRepository } from '@/database';
 import { TranseeMlKit, TranseeOcr } from '@modules/transee-mlkit';
 
 import { expoClipboardService } from './clipboard';
+import {
+  createLocalEntitlementsService,
+  type DevelopmentEntitlementsService,
+  type EntitlementsService,
+} from './entitlements';
 import { createFetchHttpClient } from './http';
 import { expoNetworkService } from './network';
 import { createMlKitOcrService } from './ocr';
@@ -119,6 +124,32 @@ const translationRouter = withCache(
  */
 const historyRepository = createHistoryRepository(createExpoSQLiteDatabase());
 
+/**
+ * Entitlements, over the same one-slot storage seam preferences use.
+ *
+ * Two bindings on purpose. `entitlementsService` is typed as the base
+ * contract, so nothing reached through `services` can change the plan — that
+ * is what a billing-backed implementation will look like. The development
+ * implementation is exported separately below.
+ */
+const localEntitlements = createLocalEntitlementsService(
+  createFilePreferencesStorage(`${STORAGE_KEYS.entitlements}.json`),
+);
+
+const entitlementsService: EntitlementsService = localEntitlements;
+
+/**
+ * The plan switcher's only door, and only in a development build.
+ *
+ * `__DEV__` is a compile-time constant, so a release bundle keeps the
+ * `undefined` branch and drops the switcher UI that depends on it. When real
+ * billing arrives this export goes, and any caller that survived becomes a
+ * compile error rather than a silent free upgrade.
+ */
+export const developmentEntitlements: DevelopmentEntitlementsService | undefined = __DEV__
+  ? localEntitlements
+  : undefined;
+
 export const services = {
   translation: {
     /** What the UI calls. It never picks an engine itself. */
@@ -132,6 +163,13 @@ export const services = {
   history: historyRepository,
   /** Device-local user settings. */
   preferences: createPreferencesService(createFilePreferencesStorage()),
+  /**
+   * What the user's plan entitles them to.
+   *
+   * Deliberately the read-only contract: features ask `has(capability)` and
+   * cannot change anything.
+   */
+  entitlements: entitlementsService,
   network: expoNetworkService,
   clipboard: expoClipboardService,
   ocr: ocrRecognizer,

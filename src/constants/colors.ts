@@ -27,6 +27,14 @@ export type ColorTokens = {
   primaryPressed: string;
   primaryMuted: string;
   primaryBorder: string;
+  /**
+   * Brand ink — the same hue as `primary`, dark enough to read.
+   *
+   * `primary` is a light sky blue chosen for fills, where dark text sits on
+   * top of it. As text on the app background it would be illegible, so every
+   * brand-coloured word and glyph uses this instead.
+   */
+  primaryStrong: string;
 
   accent: string;
   accentMuted: string;
@@ -40,6 +48,27 @@ export type ColorTokens = {
 
   /** Backdrop behind modals and full-screen loaders. */
   overlay: string;
+  /**
+   * The header gradient, and what is legible on top of it.
+   *
+   * Two stops rather than one flat bar: the header is the only large block of
+   * brand colour in the app, and a gentle fall from a deeper to a lighter blue
+   * gives it depth without any imagery. Painted with the platform's own
+   * gradient support, so no drawing library is involved.
+   */
+  gradientFrom: string;
+  gradientTo: string;
+  onGradient: string;
+  onGradientMuted: string;
+  /**
+   * A raised chip sitting *on* the gradient.
+   *
+   * Separate from `onGradientMuted`, which is a muted **text** colour. Using
+   * that as a surface is what turned the brand tile into a dark square: on the
+   * light gradient the muted ink is dark, and a dark ink makes a dark tile.
+   */
+  onGradientSurface: string;
+
   /**
    * The camera surface, and what sits on top of it.
    *
@@ -73,12 +102,13 @@ export const lightColors: ColorTokens = {
   text: palette.neutral[900],
   textSecondary: palette.neutral[600],
   textMuted: palette.neutral[400],
-  textOnPrimary: palette.neutral[0],
+  textOnPrimary: palette.neutral[900],
 
-  primary: palette.indigo[500],
-  primaryPressed: palette.indigo[600],
+  primary: palette.indigo[400],
+  primaryPressed: palette.indigo[500],
   primaryMuted: palette.indigo[50],
   primaryBorder: palette.indigo[200],
+  primaryStrong: palette.indigo[700],
 
   accent: palette.teal[600],
   accentMuted: palette.teal[50],
@@ -91,6 +121,12 @@ export const lightColors: ColorTokens = {
   dangerMuted: palette.red[100],
 
   overlay: 'rgba(11, 12, 16, 0.45)',
+  gradientFrom: palette.indigo[500],
+  gradientTo: palette.indigo[300],
+  // Dark ink, not white: white on this blue is about 1.6:1 and unreadable.
+  onGradient: palette.neutral[900],
+  onGradientMuted: 'rgba(10, 78, 107, 0.72)',
+  onGradientSurface: 'rgba(255, 255, 255, 0.7)',
   cameraSurface: '#000000',
   onCamera: '#FFFFFF',
   onCameraMuted: 'rgba(255, 255, 255, 0.4)',
@@ -99,8 +135,8 @@ export const lightColors: ColorTokens = {
 
   tabBar: palette.neutral[0],
   tabBarBorder: palette.neutral[200],
-  tabBarActive: palette.indigo[600],
-  tabBarInactive: palette.neutral[500],
+  tabBarActive: palette.indigo[700],
+  tabBarInactive: palette.neutral[600],
 };
 
 export const darkColors: ColorTokens = {
@@ -115,10 +151,11 @@ export const darkColors: ColorTokens = {
   text: palette.neutral[50],
   textSecondary: palette.neutral[400],
   textMuted: palette.neutral[500],
-  textOnPrimary: palette.neutral[0],
+  textOnPrimary: palette.neutral[900],
 
   primary: palette.indigo[400],
   primaryPressed: palette.indigo[300],
+  primaryStrong: palette.indigo[300],
   primaryMuted: 'rgba(124, 131, 241, 0.14)',
   primaryBorder: 'rgba(124, 131, 241, 0.32)',
 
@@ -133,6 +170,12 @@ export const darkColors: ColorTokens = {
   dangerMuted: 'rgba(219, 69, 69, 0.16)',
 
   overlay: 'rgba(0, 0, 0, 0.6)',
+  gradientFrom: palette.indigo[800],
+  gradientTo: palette.indigo[700],
+  // Deep enough here that white is the readable choice.
+  onGradient: '#FFFFFF',
+  onGradientMuted: 'rgba(255, 255, 255, 0.72)',
+  onGradientSurface: 'rgba(255, 255, 255, 0.16)',
   cameraSurface: '#000000',
   onCamera: '#FFFFFF',
   onCameraMuted: 'rgba(255, 255, 255, 0.4)',

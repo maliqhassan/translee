@@ -345,11 +345,23 @@ describe('the fix is reachable from where it is needed', () => {
     assert.match(screen, /'\/settings\/language-packs'/);
   });
 
-  it('only checks readiness in on-device mode', () => {
+  it('checks readiness everywhere a pack could be the reason', () => {
     const screen = readFileSync('src/features/translation/screens/translate-screen.tsx', 'utf8');
 
-    // In automatic and online, a missing pack is not the user's problem.
-    assert.match(screen, /translationMode === 'offline'/);
+    // This was on-device only. In automatic, an undownloaded pack with no
+    // backend reachable then surfaced as "this language pair is not available
+    // yet", blaming the languages for a missing download. Online stays
+    // excluded: there a pack genuinely is not the user's problem.
+    assert.match(screen, /useOfflineReadiness\(mode !== 'online'\)/);
+  });
+
+  it('still warns before translating only in on-device mode', () => {
+    const screen = readFileSync('src/features/translation/screens/translate-screen.tsx', 'utf8');
+
+    // In automatic, online may well serve the pair, so a pre-emptive banner
+    // about a missing pack would be noise. Readiness explains a failure there
+    // rather than pre-empting one.
+    assert.match(screen, /readiness=\{mode === 'offline' \? readiness : undefined\}/);
   });
 
   it('re-checks on focus, so returning from a download is not stale', () => {

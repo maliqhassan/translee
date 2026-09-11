@@ -24,7 +24,10 @@ export const DEFAULT_PREFERENCES: Preferences = {
   sourceLanguage: DEFAULTS.sourceLanguage,
   targetLanguage: DEFAULTS.targetLanguage,
   translationMode: 'auto',
-  theme: 'system',
+  // Light by default rather than following the system: the design is built
+  // and reviewed in light mode, and a first launch should look the way it was
+  // designed. Dark mode stays available and is still a one-tap choice.
+  theme: 'light',
   saveHistory: true,
 };
 

@@ -1,5 +1,6 @@
 export * from './app-providers';
 export * from './database-store';
+export * from './entitlements-store';
 export * from './language-pair-rules';
 export * from './language-store';
 export * from './network-store';

@@ -458,7 +458,9 @@ describe('the microphone is wired, not decorative', () => {
 
     // The control exists, calls toggle, and knows nothing about the platform.
     assert.match(composer, /speech\.toggle\(sourceLanguage\)/);
-    assert.match(composer, /speech\.listening \? 'Stop listening'/);
+    // The redesign made this a labelled button rather than a bare icon, so the
+    // listening state is now shown by the label as well as the glyph.
+    assert.match(composer, /speech\.listening \? 'Stop' : 'Speak'/);
     assert.equal(composer.includes('expo-speech-recognition'), false);
   });
 

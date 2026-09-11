@@ -26,7 +26,7 @@ export function LanguagePacksScreen() {
   const downloaded = packs.filter((pack) => pack.state === 'ready').length;
 
   return (
-    <Screen edges={['top']}>
+    <Screen edges={['top', 'bottom']}>
       <ScreenHeader
         title="Language Packs"
         subtitle="Download a language to translate it without a connection"

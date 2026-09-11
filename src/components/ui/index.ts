@@ -10,4 +10,5 @@ export * from './list-item';
 export * from './loading';
 export * from './search-field';
 export * from './section-header';
+export * from './segmented-control';
 export * from './text';

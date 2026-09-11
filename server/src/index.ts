@@ -23,6 +23,7 @@ function selectProvider(): TranslationProvider {
   const azure = createAzureProvider({
     apiKey: config.providerApiKey,
     region: config.providerRegion,
+    endpoint: config.providerEndpoint,
     timeoutMs: config.providerTimeoutMs,
   });
 

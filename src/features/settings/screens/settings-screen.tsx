@@ -2,11 +2,27 @@ import { useRouter } from 'expo-router';
 import { useCallback } from 'react';
 import { Alert, Switch, View } from 'react-native';
 
-import { Card, Divider, ListItem, Screen, ScreenHeader, SectionHeader, Text } from '@/components';
+import {
+  Badge,
+  Card,
+  Divider,
+  ListItem,
+  Screen,
+  ScreenHeader,
+  SectionHeader,
+  Text,
+  type BadgeTone,
+} from '@/components';
 import { APP, isAutoDetect, languageName } from '@/constants';
 import { useHistoryActions } from '@/features/history';
 import { useTheme } from '@/hooks';
-import { useLanguagePair, usePreferences } from '@/store';
+import type { Plan } from '@/services';
+import {
+  useDevelopmentPlanSwitcher,
+  useEntitlements,
+  useLanguagePair,
+  usePreferences,
+} from '@/store';
 import type { BooleanPreference, ThemePreference, TranslationMode } from '@/types';
 
 /** Cycled in order, so one tap moves to the next option. */
@@ -31,6 +47,23 @@ const MODE_HINTS: Record<TranslationMode, string> = {
   offline: 'Only use downloaded language packs',
 };
 
+/*
+ * Plan copy as lookup tables, like the theme and mode labels above.
+ *
+ * A table rather than a comparison: `plan === 'pro'` in a screen is exactly
+ * the scattered commercial logic the entitlement system exists to avoid, and
+ * a table also cannot go half-updated when a tier is added.
+ */
+const PLAN_LABELS: Record<Plan, string> = { free: 'Free', pro: 'Pro' };
+const PLAN_TONES: Record<Plan, BadgeTone> = { free: 'neutral', pro: 'primary' };
+const PLAN_SUBTITLES: Record<Plan, string> = {
+  free: 'Unlock camera scanning, speech-to-text and more',
+  pro: 'Camera scanning, speech-to-text, offline translation and no ads',
+};
+
+/** Cycled by the development switcher, in the same way the theme row cycles. */
+const PLAN_ORDER: readonly Plan[] = ['free', 'pro'];
+
 /** Steps to the next value in a fixed list, wrapping at the end. */
 function next<T>(order: readonly T[], current: T, fallback: T): T {
   return order[(order.indexOf(current) + 1) % order.length] ?? fallback;
@@ -42,6 +75,12 @@ export function SettingsScreen() {
   const { preferences, update, toggle, reset, saveError } = usePreferences();
   const { pair } = useLanguagePair();
   const { clear } = useHistoryActions();
+  const { plan } = useEntitlements();
+  /**
+   * Undefined in a release build, so the section below it never renders and
+   * the switcher cannot ship. Nothing here can change a plan in production.
+   */
+  const planSwitcher = useDevelopmentPlanSwitcher();
 
   const openPicker = (field: 'source' | 'target') => {
     router.push({ pathname: '/translate/language-picker', params: { field } });
@@ -88,6 +127,19 @@ export function SettingsScreen() {
           </Text>
         </Card>
       ) : null}
+
+      <View>
+        <SectionHeader title="Plan" />
+        <Card variant="outlined" padding="none">
+          <ListItem
+            icon="sparkles-outline"
+            title={`${APP.name} Pro`}
+            subtitle={PLAN_SUBTITLES[plan]}
+            onPress={() => router.push('/upgrade')}
+            trailing={<Badge label={PLAN_LABELS[plan]} tone={PLAN_TONES[plan]} />}
+          />
+        </Card>
+      </View>
 
       <View>
         <SectionHeader title="Translation" />
@@ -176,6 +228,33 @@ export function SettingsScreen() {
           />
         </Card>
       </View>
+
+      {/* Development only. `useDevelopmentPlanSwitcher` returns undefined in a
+          release build, so this section has no way to render there. */}
+      {planSwitcher ? (
+        <View>
+          <SectionHeader
+            title="Developer"
+            description="Development builds only. This switch is local product gating, not a purchase."
+          />
+          <Card variant="outlined" padding="none">
+            <ListItem
+              icon="flask-outline"
+              title="Plan"
+              subtitle="Switch between Free and Pro to test entitlement gating"
+              onPress={() => planSwitcher.setPlan(next(PLAN_ORDER, planSwitcher.plan, 'free'))}
+              showChevron={false}
+              accessibilityLabel={`Plan, currently ${PLAN_LABELS[planSwitcher.plan]}`}
+              accessibilityHint="Cycles between the free and pro plans"
+              trailing={
+                <Text variant="body" color="textSecondary">
+                  {PLAN_LABELS[planSwitcher.plan]}
+                </Text>
+              }
+            />
+          </Card>
+        </View>
+      ) : null}
 
       <View>
         <SectionHeader title="About" />

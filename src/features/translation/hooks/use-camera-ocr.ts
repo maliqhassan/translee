@@ -1,15 +1,24 @@
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { FEATURES } from '@/constants';
-import { services } from '@/services';
+import { resolveFeatureAccess, services } from '@/services';
+import { useEntitlements } from '@/store';
 import type { AppError } from '@/types';
 
 /**
  * Scanning text with the camera, as the translate screen needs it.
  *
- * Owns the flow and the state a control renders from; the screen never sees
- * the camera or the recogniser. Opening the scanner is the only thing that can
- * ask for the camera permission, and it happens on a tap and nowhere else.
+ * Owns the flow, the state a control renders from, and the entitlement
+ * decision; the screen never sees the camera, the recogniser or the plan.
+ * Opening the scanner is the only thing that can ask for the camera
+ * permission, and it happens on a tap and nowhere else.
+ *
+ * Three things have to be true before a scan can start, and they are checked
+ * in this order: the capability has shipped, the device can do it, and the
+ * plan includes it. The order decides what the user is told — a phone with no
+ * recogniser reads as unavailable and is never offered an upgrade, because
+ * upgrading would not give it one.
  *
  * Recognised text is handed to the caller and nothing else — not logged, and
  * not translated automatically. The user reads it, fixes anything the
@@ -18,14 +27,19 @@ import type { AppError } from '@/types';
  */
 
 export type ScanStatus =
-  /** No recogniser in this build, or the capability has not shipped. */
+  /** No recogniser in this build or on this device. Never an upsell. */
   | 'unavailable'
+  /** The device could scan, but this plan does not include it. */
+  | 'locked'
   | 'idle'
   /** The camera sheet is open and waiting for a capture. */
   | 'scanning'
   /** A capture is being read. */
   | 'recognizing'
   | 'error';
+
+/** The part of the status the flow owns, once the gate has let it through. */
+type ScanFlow = 'idle' | 'scanning' | 'recognizing' | 'error';
 
 export type CameraOcrController = {
   status: ScanStatus;
@@ -39,12 +53,25 @@ export type CameraOcrController = {
   close: () => void;
   /** Called by the scanner with the captured file. */
   capture: (imageUri: string) => void;
+  /** Opens the upgrade screen. Does nothing unless the status is `locked`. */
+  upgrade: () => void;
   dismissError: () => void;
 };
 
 export function useCameraOcr(onText: (text: string) => void): CameraOcrController {
-  const [status, setStatus] = useState<ScanStatus>('unavailable');
+  const router = useRouter();
+  const { has, loaded } = useEntitlements();
+
+  const [flow, setFlow] = useState<ScanFlow>('idle');
   const [error, setError] = useState<AppError | undefined>(undefined);
+  /**
+   * Undefined until the recogniser has answered for itself — except when the
+   * capability is not in this build, where there is nothing to ask and the
+   * answer is known before the first render.
+   */
+  const [supported, setSupported] = useState<boolean | undefined>(
+    FEATURES.cameraOcr ? undefined : false,
+  );
 
   const mounted = useRef(true);
   /** Rejects a second capture while one is still being read. */
@@ -58,51 +85,85 @@ export function useCameraOcr(onText: (text: string) => void): CameraOcrControlle
   useEffect(() => {
     mounted.current = true;
 
-    if (!FEATURES.cameraOcr) return;
-
-    void services.ocr.isAvailable().then((can) => {
-      if (mounted.current && can) setStatus('idle');
-    });
+    // The device is asked only when the capability shipped, so a build
+    // without it never probes the recogniser at all.
+    if (FEATURES.cameraOcr) {
+      void services.ocr.isAvailable().then((can) => {
+        if (mounted.current) setSupported(can);
+      });
+    }
 
     return () => {
       mounted.current = false;
     };
   }, []);
 
+  /**
+   * Nothing is offered until both answers are in.
+   *
+   * Treating the unresolved moment as `unavailable` rather than `locked` is
+   * what stops a Pro user seeing the lock flash up before their plan arrives.
+   */
+  const access =
+    supported === undefined || !loaded
+      ? 'unavailable'
+      : resolveFeatureAccess({
+          shipped: FEATURES.cameraOcr,
+          supported,
+          entitled: has('cameraOcr'),
+        });
+
+  const allowed = access === 'allowed';
+
+  // The gate wins over the flow, so a plan that changes mid-session closes
+  // whatever was open rather than leaving a scanner running behind a lock.
+  const status: ScanStatus = allowed ? flow : access;
+
   const open = useCallback(() => {
+    if (!allowed) return;
     setError(undefined);
-    // Guarded on the current status so a build without the recogniser can
-    // never open a camera it has no use for.
-    setStatus((current) => (current === 'unavailable' ? current : 'scanning'));
-  }, []);
+    setFlow('scanning');
+  }, [allowed]);
 
   const close = useCallback(() => {
     reading.current = false;
-    setStatus((current) => (current === 'unavailable' ? current : 'idle'));
+    setFlow('idle');
   }, []);
 
-  const capture = useCallback((imageUri: string) => {
-    if (reading.current) return;
-    reading.current = true;
-    setStatus('recognizing');
+  const capture = useCallback(
+    (imageUri: string) => {
+      // Guarded here as well as at `open`, so no path can reach the recogniser
+      // without the entitlement — not a stale callback, not a sheet left open.
+      if (!allowed || reading.current) return;
+      reading.current = true;
+      setFlow('recognizing');
 
-    void (async () => {
-      const result = await services.ocr.recognize({ imageUri });
-      reading.current = false;
-      if (!mounted.current) return;
+      void (async () => {
+        const result = await services.ocr.recognize({ imageUri });
+        reading.current = false;
+        if (!mounted.current) return;
 
-      if (!result.ok) {
-        // A failed read leaves the draft exactly as it was: no stale text, no
-        // half-recognised fragment, nothing invented.
-        setError(result.error);
-        setStatus('error');
-        return;
-      }
+        if (!result.ok) {
+          // A failed read leaves the draft exactly as it was: no stale text, no
+          // half-recognised fragment, nothing invented.
+          setError(result.error);
+          setFlow('error');
+          return;
+        }
 
-      handler.current(result.value.fullText);
-      setStatus('idle');
-    })();
-  }, []);
+        handler.current(result.value.fullText);
+        setFlow('idle');
+      })();
+    },
+    [allowed],
+  );
+
+  const upgrade = useCallback(() => {
+    // Only a locked feature may lead to the paywall. A device that cannot
+    // scan is never offered something that would not help it.
+    if (access !== 'locked') return;
+    router.push('/upgrade');
+  }, [access, router]);
 
   return {
     status,
@@ -112,9 +173,10 @@ export function useCameraOcr(onText: (text: string) => void): CameraOcrControlle
     open,
     close,
     capture,
+    upgrade,
     dismissError: useCallback(() => {
       setError(undefined);
-      setStatus((current) => (current === 'error' ? 'idle' : current));
+      setFlow((current) => (current === 'error' ? 'idle' : current));
     }, []),
   };
 }

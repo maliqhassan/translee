@@ -1,55 +1,39 @@
 import { Tabs } from 'expo-router';
 
-import { Icon, type IconName } from '@/components';
-import { useTheme } from '@/hooks';
+import { AppTabBar, type TabIcons } from '@/components';
 
 type TabConfig = {
   name: string;
   title: string;
-  icon: IconName;
-  iconActive: IconName;
 };
 
 /** Declaring tabs as data keeps the layout free of repeated JSX. */
 const TABS: readonly TabConfig[] = [
-  { name: 'index', title: 'Translate', icon: 'language-outline', iconActive: 'language' },
-  { name: 'camera', title: 'Camera', icon: 'camera-outline', iconActive: 'camera' },
-  { name: 'history', title: 'History', icon: 'time-outline', iconActive: 'time' },
-  { name: 'settings', title: 'Settings', icon: 'settings-outline', iconActive: 'settings' },
+  { name: 'index', title: 'Translate' },
+  { name: 'camera', title: 'Camera' },
+  { name: 'history', title: 'History' },
+  { name: 'settings', title: 'Settings' },
 ];
 
-export default function TabsLayout() {
-  const theme = useTheme();
+/** Filled when selected, outlined otherwise — the usual Ionicons pairing. */
+const TAB_ICONS: TabIcons = {
+  index: { inactive: 'language-outline', active: 'language' },
+  camera: { inactive: 'camera-outline', active: 'camera' },
+  history: { inactive: 'time-outline', active: 'time' },
+  settings: { inactive: 'settings-outline', active: 'settings' },
+};
 
+export default function TabsLayout() {
   return (
     <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: theme.colors.tabBarActive,
-        tabBarInactiveTintColor: theme.colors.tabBarInactive,
-        tabBarStyle: {
-          backgroundColor: theme.colors.tabBar,
-          borderTopColor: theme.colors.tabBarBorder,
-          height: theme.layout.tabBarHeight,
-        },
-        tabBarLabelStyle: theme.typography.variants.caption,
-      }}
+      // The bar is ours: a floating rounded pill rather than a full-width
+      // strip. It handles its own safe-area inset, which is what keeps it
+      // clear of the Android gesture bar and the back/home/recents buttons.
+      tabBar={(props) => <AppTabBar {...props} icons={TAB_ICONS} />}
+      screenOptions={{ headerShown: false }}
     >
       {TABS.map((tab) => (
-        <Tabs.Screen
-          key={tab.name}
-          name={tab.name}
-          options={{
-            title: tab.title,
-            tabBarIcon: ({ focused }) => (
-              <Icon
-                name={focused ? tab.iconActive : tab.icon}
-                size={22}
-                color={focused ? 'tabBarActive' : 'tabBarInactive'}
-              />
-            ),
-          }}
-        />
+        <Tabs.Screen key={tab.name} name={tab.name} options={{ title: tab.title }} />
       ))}
     </Tabs>
   );

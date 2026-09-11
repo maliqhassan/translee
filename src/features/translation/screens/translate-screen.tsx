@@ -1,10 +1,10 @@
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback } from 'react';
 import { View } from 'react-native';
 
-import { Button, Card, IconButton, Screen, ScreenHeader, Text } from '@/components';
+import { Button, Card, GradientHeader, IconButton, Screen, Text } from '@/components';
 import { APP, errorMessage } from '@/constants';
-import { TextScanner } from '@/features/camera';
+import { TextScanner, consumePendingScan } from '@/features/camera';
 import { RecentTranslations } from '@/features/history';
 import { OfflineReadinessNotice, offlineNotice, useOfflineReadiness } from '@/features/offline';
 import { useTheme } from '@/hooks';
@@ -12,7 +12,7 @@ import { useLanguagePair, usePreferences, type LanguageField } from '@/store';
 import type { AppError } from '@/types';
 
 import { BrandMark } from '../components/brand-mark';
-import { LanguageBar } from '../components/language-bar';
+import { SwapLanguagesButton } from '../components/swap-languages-button';
 import { TranslationComposer } from '../components/translation-composer';
 import { TranslationResultCard } from '../components/translation-result-card';
 import { useCameraOcr } from '../hooks/use-camera-ocr';
@@ -67,11 +67,33 @@ export function TranslateScreen() {
    */
   const scan = useCameraOcr(setScanned);
 
+  /**
+   * A scan made on the Camera tab arrives here.
+   *
+   * Collected on focus and consumed as it is read, so coming back to this
+   * screen later never re-applies an old capture.
+   */
+  useFocusEffect(
+    useCallback(() => {
+      const scanned = consumePendingScan();
+      if (scanned) setScanned(scanned);
+    }, [setScanned]),
+  );
+
   const isTranslating = state.status === 'loading';
 
-  // Only in on-device mode: in automatic and online, a missing pack is not
-  // something the user needs to act on, and saying so would be noise.
-  const { readiness } = useOfflineReadiness(preferences.translationMode === 'offline');
+  const mode = preferences.translationMode;
+
+  /*
+   * Checked in automatic mode too, not just on-device.
+   *
+   * In automatic, an undownloaded pack with no backend reachable produced
+   * "this language pair is not available yet" — which blames the languages for
+   * a missing download. The check is a local read, so it costs nothing to know
+   * the real reason. Online mode is excluded: there a pack is genuinely not
+   * the user's problem.
+   */
+  const { readiness } = useOfflineReadiness(mode !== 'online');
 
   /**
    * Only these two codes can mean "something is missing on the device". Every
@@ -91,14 +113,16 @@ export function TranslateScreen() {
     <Screen
       scrollable
       keyboardAvoiding
+      headerBleed
       header={
-        <ScreenHeader
-          compact
+        <GradientHeader
           title={APP.name}
-          leading={<BrandMark />}
+          subtitle={APP.tagline}
+          leading={<BrandMark onGradient />}
           actions={
             <IconButton
               name="settings-outline"
+              variant="soft"
               accessibilityLabel="Open settings"
               onPress={() => router.push('/settings')}
             />
@@ -106,26 +130,36 @@ export function TranslateScreen() {
         />
       }
     >
-      <LanguageBar
-        source={pair.source}
-        target={pair.target}
-        canSwap={canSwap}
-        onSelect={openPicker}
-        onSwap={swap}
-      />
+      {/* The banner stays on-device-only. In automatic, a missing pack is not
+          something to act on *before* translating — online may well serve it —
+          so readiness is used to explain a failure, not to pre-empt one. */}
+      <OfflineReadinessNotice readiness={mode === 'offline' ? readiness : undefined} />
 
-      <OfflineReadinessNotice readiness={readiness} />
-
-      <View style={{ gap: theme.spacing.md }}>
+      <View style={{ gap: theme.spacing.sm }}>
         <TranslationComposer
           value={input}
           onChangeText={setInput}
           onClear={clearInput}
           onPaste={paste}
           sourceLanguage={pair.source}
+          onSelectLanguage={openPicker}
           editable={!isTranslating}
           speech={speech}
           scan={scan}
+        />
+
+        <SwapLanguagesButton canSwap={canSwap} onSwap={swap} />
+
+        <TranslationResultCard
+          state={state}
+          targetLanguage={pair.target}
+          copy={copy}
+          onClear={reset}
+          onRetry={translate}
+          offlineDetail={offlineDetail}
+          onOpenPacks={() => router.push('/settings/language-packs')}
+          speak={speak}
+          onSelectLanguage={openPicker}
         />
 
         {scan.error ? (
@@ -170,17 +204,6 @@ export function TranslateScreen() {
           accessibilityHint="Translates the text you entered"
         />
       </View>
-
-      <TranslationResultCard
-        state={state}
-        targetLanguage={pair.target}
-        copy={copy}
-        onClear={reset}
-        onRetry={translate}
-        offlineDetail={offlineDetail}
-        onOpenPacks={() => router.push('/settings/language-packs')}
-        speak={speak}
-      />
 
       <TextScanner
         visible={scan.scanning}

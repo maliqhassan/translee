@@ -88,7 +88,7 @@ export function HistoryDetailScreen() {
 
   if (entry.status === 'loading') {
     return (
-      <Screen header={header}>
+      <Screen edges={['top', 'bottom']} header={header}>
         <LoadingState message="Loading translation…" />
       </Screen>
     );
@@ -96,7 +96,7 @@ export function HistoryDetailScreen() {
 
   if (entry.status === 'error') {
     return (
-      <Screen header={header}>
+      <Screen edges={['top', 'bottom']} header={header}>
         <EmptyState
           icon="alert-circle-outline"
           title="History unavailable"
@@ -110,7 +110,7 @@ export function HistoryDetailScreen() {
   // while this screen was open, or the link may be stale.
   if (!entry.data) {
     return (
-      <Screen header={header}>
+      <Screen edges={['top', 'bottom']} header={header}>
         <EmptyState
           icon="document-text-outline"
           title="Translation not found"
@@ -126,7 +126,7 @@ export function HistoryDetailScreen() {
   const sourceId = record.detectedLanguage ?? record.sourceLanguage;
 
   return (
-    <Screen scrollable header={header}>
+    <Screen edges={['top', 'bottom']} scrollable header={header}>
       <TextPanel label="From" code={languageShortCode(sourceId)} text={record.sourceText} />
 
       <View style={{ alignItems: 'center' }}>

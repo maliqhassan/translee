@@ -5,18 +5,28 @@
  */
 
 export const palette = {
-  /** Brand — a calm indigo used for primary actions and focus states. */
+  /**
+   * Brand — a bright sky blue built around #70D6FF.
+   *
+   * The requested colour is `400`, and it is deliberately light. That makes it
+   * excellent as a *fill* with dark text on it (about 11.5:1) and unusable as
+   * text on a white surface (about 1.6:1, where 4.5:1 is the floor). The scale
+   * therefore carries a darker shade of the same hue at `700` for anything
+   * that has to be read as text or an icon.
+   */
   indigo: {
-    50: '#EEF0FE',
-    100: '#DFE3FD',
-    200: '#C3CAFB',
-    300: '#9FA8F7',
-    400: '#7C83F1',
-    500: '#5A5FE6',
-    600: '#4A46D1',
-    700: '#3D38AC',
-    800: '#33308B',
-    900: '#2B2A6E',
+    50: '#EAF8FF',
+    100: '#D2F0FF',
+    200: '#B0E6FF',
+    300: '#8FDCFF',
+    /** The requested brand colour. */
+    400: '#70D6FF',
+    500: '#38BDF0',
+    600: '#0EA5D9',
+    /** Brand ink: 4.95:1 on the app background, so text and icons use this. */
+    700: '#0A749C',
+    800: '#0A6386',
+    900: '#0A4E6B',
   },
   /** Accent — teal, reserved for offline/ready affordances. */
   teal: {

@@ -74,7 +74,9 @@ describe('default preferences', () => {
       sourceLanguage: 'en',
       targetLanguage: 'de',
       translationMode: 'auto',
-      theme: 'system',
+      // Light rather than following the system: the design is built and
+      // reviewed in light mode, so a first launch looks as designed.
+      theme: 'light',
       saveHistory: true,
     });
   });
@@ -138,7 +140,7 @@ describe('parsing stored preferences', () => {
   });
 
   it('rejects an invalid theme', () => {
-    assert.equal(parsePreferences({ theme: 'neon' }).theme, 'system');
+    assert.equal(parsePreferences({ theme: 'neon' }).theme, DEFAULT_PREFERENCES.theme);
   });
 
   it('rejects a non-boolean saveHistory', () => {

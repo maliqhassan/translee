@@ -1,4 +1,5 @@
 export * from './clipboard';
+export * from './entitlements';
 export * from './http';
 export * from './language-packs';
 export * from './network';

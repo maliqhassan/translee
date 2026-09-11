@@ -1,12 +1,5 @@
 import type { ReactNode } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StatusBar,
-  View,
-  type ViewStyle,
-} from 'react-native';
+import { KeyboardAvoidingView, ScrollView, StatusBar, View, type ViewStyle } from 'react-native';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 
 import { useTheme } from '@/hooks';
@@ -21,6 +14,14 @@ export type ScreenProps = {
   keyboardAvoiding?: boolean;
   /** Removes the default horizontal gutter for edge-to-edge content. */
   edgeToEdge?: boolean;
+  /**
+   * Lets the header run to the screen edges and under the status bar.
+   *
+   * For the gradient header, which pays its own top inset so the colour can
+   * reach the very top. The screen therefore stops reserving the top safe
+   * area, otherwise there would be a band of background above the gradient.
+   */
+  headerBleed?: boolean;
   edges?: readonly Edge[];
   contentStyle?: ViewStyle;
 };
@@ -35,10 +36,14 @@ export function Screen({
   scrollable = false,
   keyboardAvoiding = false,
   edgeToEdge = false,
+  headerBleed = false,
   edges = ['top'],
   contentStyle,
 }: ScreenProps) {
   const theme = useTheme();
+
+  // A bleeding header owns the top inset itself.
+  const safeEdges = headerBleed ? edges.filter((edge) => edge !== 'top') : edges;
 
   const padding: ViewStyle = {
     paddingHorizontal: edgeToEdge ? 0 : theme.layout.screenPadding,
@@ -51,7 +56,11 @@ export function Screen({
       showsVerticalScrollIndicator={false}
       contentContainerStyle={[
         padding,
-        { paddingBottom: theme.spacing.xxxl, gap: theme.spacing.base },
+        {
+          paddingTop: headerBleed ? theme.spacing.base : 0,
+          paddingBottom: theme.spacing.xxxl,
+          gap: theme.spacing.base,
+        },
         contentStyle,
       ]}
     >
@@ -63,19 +72,32 @@ export function Screen({
 
   const content = (
     <>
-      {header ? <View style={padding}>{header}</View> : null}
+      {header ? <View style={headerBleed ? undefined : padding}>{header}</View> : null}
       {body}
     </>
   );
 
   return (
-    <SafeAreaView edges={edges} style={{ flex: 1, backgroundColor: theme.colors.background }}>
+    <SafeAreaView edges={safeEdges} style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <StatusBar barStyle={theme.scheme === 'dark' ? 'light-content' : 'dark-content'} />
       {keyboardAvoiding ? (
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          // Android resizes the window itself; adding padding on top double-counts.
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          /*
+           * `padding` on both platforms.
+           *
+           * This used to be iOS-only, on the reasoning that Android resizes the
+           * window itself so padding would double-count. That stopped being
+           * true: under the edge-to-edge layout Android now requires, the
+           * window is *not* resized for the keyboard, so leaving `behavior`
+           * undefined did nothing at all and the input sat underneath it.
+           *
+           * Padding is safe in both cases because the view measures the real
+           * overlap between its own frame and the top of the keyboard, floored
+           * at zero. A window that does resize reports no overlap and gets no
+           * padding, so nothing is counted twice.
+           */
+          behavior="padding"
         >
           {content}
         </KeyboardAvoidingView>

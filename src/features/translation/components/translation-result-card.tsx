@@ -3,9 +3,10 @@ import { View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 
 import { Badge, Button, Card, Icon, IconButton, Skeleton, Spinner, Text } from '@/components';
-import { errorMessage, getLanguage } from '@/constants';
+import { errorMessage } from '@/constants';
 import type { OfflineNotice } from '@/features/offline';
 import { useTheme } from '@/hooks';
+import type { LanguageField } from '@/store';
 import type {
   AppError,
   AsyncState,
@@ -16,6 +17,8 @@ import type {
 
 import type { CopyController } from '../hooks/use-copy-to-clipboard';
 import type { SpeakController } from '../hooks/use-speak';
+
+import { LanguagePanelHeader } from './language-panel-header';
 
 export type TranslationResultCardProps = {
   state: AsyncState<TranslationResult>;
@@ -33,6 +36,8 @@ export type TranslationResultCardProps = {
   onOpenPacks?: () => void;
   /** Absent when the device has no speech engine: the control is then hidden. */
   speak?: SpeakController;
+  /** Opens the picker for one side of the pair. */
+  onSelectLanguage?: (field: LanguageField) => void;
 };
 
 const ENGINE_BADGE: Record<
@@ -58,15 +63,6 @@ function ResultShell({ children }: { children: ReactNode }) {
   );
 }
 
-function TargetLabel({ code }: { code: LanguageCode }) {
-  const language = getLanguage(code);
-  return (
-    <Text variant="caption" color="textMuted">
-      {(language?.name ?? code).toUpperCase()}
-    </Text>
-  );
-}
-
 /** Renders whichever of idle / loading / error / success the screen is in. */
 export function TranslationResultCard({
   state,
@@ -77,12 +73,28 @@ export function TranslationResultCard({
   offlineDetail,
   onOpenPacks,
   speak,
+  onSelectLanguage,
 }: TranslationResultCardProps) {
   const theme = useTheme();
+
+  /**
+   * The target panel names its language in every state, so the pair stays
+   * readable while a translation is still empty, loading or failed.
+   */
+  const panelHeader = (actions?: ReactNode) =>
+    onSelectLanguage ? (
+      <LanguagePanelHeader
+        field="target"
+        id={targetLanguage}
+        onPress={() => onSelectLanguage('target')}
+        actions={actions}
+      />
+    ) : null;
 
   if (state.status === 'loading') {
     return (
       <ResultShell>
+        {panelHeader()}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
           <Spinner />
           <Text variant="caption" color="textSecondary" accessibilityLiveRegion="polite">
@@ -111,6 +123,7 @@ export function TranslationResultCard({
 
     return (
       <ResultShell>
+        {panelHeader()}
         <Animated.View
           entering={FadeIn.duration(theme.motion.duration.normal)}
           style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: theme.spacing.md }}
@@ -143,6 +156,7 @@ export function TranslationResultCard({
   if (state.status === 'idle') {
     return (
       <ResultShell>
+        {panelHeader()}
         <View
           style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: theme.spacing.sm }}
         >
@@ -161,17 +175,7 @@ export function TranslationResultCard({
   return (
     <Animated.View entering={FadeInDown.duration(theme.motion.duration.normal).springify()}>
       <ResultShell>
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: theme.spacing.sm,
-          }}
-        >
-          <TargetLabel code={targetLanguage} />
-          <Badge label={badge.label} tone={badge.tone} icon={badge.icon} />
-        </View>
+        {panelHeader(<Badge label={badge.label} tone={badge.tone} icon={badge.icon} />)}
 
         <Text variant="translatedText" selectable accessibilityLiveRegion="polite">
           {result.translatedText}

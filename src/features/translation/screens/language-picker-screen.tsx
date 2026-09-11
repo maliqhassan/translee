@@ -1,16 +1,18 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { FlatList, Platform, View, type ListRenderItemInfo } from 'react-native';
 
 import {
   Divider,
   EmptyState,
+  GradientHeader,
   IconButton,
   Screen,
-  ScreenHeader,
   SearchField,
   SectionHeader,
+  SegmentedControl,
 } from '@/components';
+import { useLanguagePackStatus } from '@/features/offline';
 import { useTheme } from '@/hooks';
 import type { LanguageField } from '@/store';
 
@@ -30,10 +32,17 @@ export function LanguagePickerScreen() {
   const router = useRouter();
   const { field } = useLocalSearchParams<{ field?: LanguageField }>();
 
-  // Any value other than an explicit `target` picks the source side.
-  const side: LanguageField = field === 'target' ? 'target' : 'source';
+  /**
+   * The route says which side was tapped; the switch below lets the user
+   * change their mind without going back and tapping the other one.
+   */
+  const [side, setSide] = useState<LanguageField>(field === 'target' ? 'target' : 'source');
+
   const dismiss = useCallback(() => router.back(), [router]);
   const picker = useLanguagePicker(side, dismiss);
+
+  /** Real offline availability, from the same runtime the packs screen reads. */
+  const packStatus = useLanguagePackStatus();
 
   const { selectedId, otherSideId, select } = picker;
   const otherSideLabel = side === 'source' ? 'Target' : 'Source';
@@ -59,30 +68,42 @@ export function LanguagePickerScreen() {
           language={item.language}
           isSelected={item.language.id === selectedId}
           otherSideLabel={item.language.id === otherSideId ? otherSideLabel : undefined}
+          packState={packStatus[item.language.id]}
           onSelect={select}
         />
       );
     },
-    [otherSideId, otherSideLabel, select, selectedId, theme.spacing.base],
+    [otherSideId, otherSideLabel, packStatus, select, selectedId, theme.spacing.base],
   );
 
   return (
     <Screen
       edgeToEdge
+      headerBleed
+      edges={['bottom']}
       header={
-        <View style={{ paddingHorizontal: theme.layout.screenPadding }}>
-          <ScreenHeader
-            compact
-            title={side === 'source' ? 'Translate from' : 'Translate to'}
-            actions={
-              <IconButton
-                name="close"
-                variant="soft"
-                accessibilityLabel="Close language picker"
-                onPress={dismiss}
-              />
-            }
+        <GradientHeader
+          title="Language Selection"
+          actions={
+            <IconButton
+              name="close"
+              variant="soft"
+              accessibilityLabel="Close language picker"
+              onPress={dismiss}
+            />
+          }
+        >
+          <SegmentedControl
+            onGradient
+            accessibilityLabel="Choose which side of the pair to change"
+            options={[
+              { value: 'source', label: 'FROM' },
+              { value: 'target', label: 'TO' },
+            ]}
+            value={side}
+            onChange={setSide}
           />
+
           <SearchField
             value={picker.query}
             onChangeText={picker.setQuery}
@@ -90,7 +111,7 @@ export function LanguagePickerScreen() {
             placeholder="Search by name or code"
             accessibilityLabel="Search languages by name, native name or code"
           />
-        </View>
+        </GradientHeader>
       }
     >
       <FlatList

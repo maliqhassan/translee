@@ -15,6 +15,14 @@ export type ServerConfig = {
   providerApiKey?: string;
   /** Azure resources outside the global endpoint need their region. */
   providerRegion?: string;
+  /**
+   * Overrides the provider's global endpoint.
+   *
+   * Azure resources created against a specific geography, or behind a private
+   * endpoint, do not answer on the global host. Left unset for the ordinary
+   * global resource, which is what most deployments use.
+   */
+  providerEndpoint?: string;
   /** Longest text the API will accept, in characters. */
   maxTextLength: number;
   /** Hard cap on request body size, enforced before parsing. */
@@ -43,6 +51,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     provider,
     providerApiKey: apiKey && apiKey.length > 0 ? apiKey : undefined,
     providerRegion: env.TRANSLATION_PROVIDER_REGION?.trim() || undefined,
+    providerEndpoint: env.TRANSLATION_PROVIDER_ENDPOINT?.trim() || undefined,
     maxTextLength: readInt(env.MAX_TEXT_LENGTH, 5000),
     maxBodyBytes: readInt(env.MAX_BODY_BYTES, 64 * 1024),
     providerTimeoutMs: readInt(env.PROVIDER_TIMEOUT_MS, 10_000),

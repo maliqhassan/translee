@@ -1,6 +1,6 @@
 import { Text as RNText, type TextProps as RNTextProps, type TextStyle } from 'react-native';
 
-import type { ColorTokens, TextVariant } from '@/constants';
+import { resolveInk, type ColorTokens, type TextVariant } from '@/constants';
 import { useTheme } from '@/hooks';
 
 /** Colour token keys that make sense for text. */
@@ -17,6 +17,8 @@ export type TextColor = Extract<
   | 'danger'
   | 'onCamera'
   | 'onCameraMuted'
+  | 'onGradient'
+  | 'onGradientMuted'
 >;
 
 export type TextProps = RNTextProps & {
@@ -35,7 +37,7 @@ export function Text({ variant = 'body', color = 'text', align, style, ...rest }
     <RNText
       style={[
         theme.typography.variants[variant],
-        { color: theme.colors[color], textAlign: align },
+        { color: resolveInk(theme, color), textAlign: align },
         style,
       ]}
       {...rest}

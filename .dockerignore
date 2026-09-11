@@ -1,0 +1,23 @@
+# The image only needs `server/` and the generated language table in `shared/`.
+node_modules
+**/node_modules
+.git
+.expo
+dist
+.test-build
+server/dist
+server/.test-build
+android
+ios
+app
+src
+assets
+modules
+tests
+docs
+scripts
+*.apk
+*.aab
+.env
+.env.*
+!.env.example

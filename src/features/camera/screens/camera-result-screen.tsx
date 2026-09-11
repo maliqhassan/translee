@@ -6,7 +6,7 @@ import { EmptyState, Screen, ScreenHeader } from '@/components';
  */
 export function CameraResultScreen() {
   return (
-    <Screen>
+    <Screen edges={['top', 'bottom']}>
       <ScreenHeader title="Scan result" />
       <EmptyState
         icon="scan-outline"

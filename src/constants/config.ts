@@ -2,13 +2,19 @@
 export const APP = {
   name: 'Transee',
   tagline: 'Translate anywhere, online or off',
-  version: '0.1.0',
+  version: '0.2.0',
 } as const;
 
 /** Keys for persisted values. Namespaced so a stray key can never collide. */
 export const STORAGE_KEYS = {
   preferences: 'transee.preferences.v1',
   languageSelection: 'transee.languages.v1',
+  /**
+   * The user's plan. Its own slot rather than a preference: a preference is
+   * something the user chooses, and this will stop being one the moment it is
+   * issued by a server instead of set on the device.
+   */
+  entitlements: 'transee.entitlements.v1',
 } as const;
 
 export const DEFAULTS = {
