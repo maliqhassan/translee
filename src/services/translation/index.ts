@@ -2,6 +2,7 @@ export * from './caching-router';
 export * from './in-flight-requests';
 export * from './mock-translation-service';
 export * from './offline';
+export * from './offline-entitlement';
 export * from './offline-translation-service';
 export * from './online-translation-service';
 export * from './provider';

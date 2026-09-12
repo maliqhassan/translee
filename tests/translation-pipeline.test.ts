@@ -350,3 +350,100 @@ describe('caching router', () => {
     assert.equal(!result.ok && result.error.code, 'invalid_request');
   });
 });
+
+/**
+ * Step 2C, end to end: the shape the app is actually in today.
+ *
+ * No backend is deployed, so the online engine reports itself unusable and the
+ * on-device engine is the only thing that can answer. That is precisely the
+ * configuration in which a free user must receive an error rather than a
+ * translation, and the one where getting the gate wrong is invisible — the
+ * request succeeds and nobody notices who served it.
+ */
+describe('the full pipeline refuses a free user the on-device engine', () => {
+  const offlineEngine: TranslationService = {
+    id: 'test.offline.ready',
+    engine: 'offline',
+    isAvailable: async () => true,
+    supportsPair: async () => true,
+    translate: async () =>
+      ok({
+        id: 'offline-1',
+        sourceText: 'Hello',
+        translatedText: 'Hallo',
+        sourceLanguage: 'en',
+        targetLanguage: 'de',
+        engine: 'offline' as const,
+        origin: 'text' as const,
+        createdAt: 0,
+      }),
+    detectLanguage: async () => ok({ code: 'en', confidence: 1 }),
+  };
+
+  const unusableOnline: TranslationService = {
+    id: 'test.online.unconfigured',
+    engine: 'online',
+    isAvailable: async () => false,
+    supportsPair: async () => true,
+    translate: async () => ok(null as never),
+    detectLanguage: async () => ok(null as never),
+  };
+
+  /** The registry's real composition: router, cache and in-flight sharing. */
+  const pipelineFor = (entitled: () => boolean) =>
+    withCache(
+      createTranslationRouter({
+        engines: [unusableOnline, offlineEngine],
+        network: networkOf('offline'),
+        mode: () => 'auto',
+        offlineEntitled: entitled,
+      }),
+      {
+        cache: createMemoryTranslationCache({ maxEntries: 8 }),
+        offlineEntitled: entitled,
+      },
+    );
+
+  it('returns an error, and never an on-device translation', async () => {
+    const result = await pipelineFor(() => false).translate(request);
+
+    // Checked before the narrowing assertion below, so this genuinely reads
+    // the result rather than a type-narrowed `never`.
+    assert.equal(result.ok && result.value.translatedText === 'Hallo', false);
+    assert.equal(result.ok, false);
+  });
+
+  it('serves a pro user the same request normally', async () => {
+    const result = await pipelineFor(() => true).translate(request);
+
+    assert.equal(result.ok, true);
+    assert.equal(result.ok && result.value.engine, 'offline');
+    assert.equal(result.ok && result.value.translatedText, 'Hallo');
+  });
+
+  it('does not let the cache re-serve what the router just refused', async () => {
+    let entitled = true;
+    const pipeline = withCache(
+      createTranslationRouter({
+        engines: [unusableOnline, offlineEngine],
+        network: networkOf('offline'),
+        mode: () => 'auto',
+        offlineEntitled: () => entitled,
+      }),
+      {
+        cache: createMemoryTranslationCache({ maxEntries: 8 }),
+        offlineEntitled: () => entitled,
+      },
+    );
+
+    // Earned and cached while Pro.
+    const asPro = await pipeline.translate(request);
+    assert.equal(asPro.ok && asPro.value.engine, 'offline');
+
+    entitled = false;
+
+    // The identical request would hit the cache first; both layers must refuse.
+    const asFree = await pipeline.translate(request);
+    assert.equal(asFree.ok, false);
+  });
+});

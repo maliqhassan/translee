@@ -15,6 +15,7 @@ const ERROR_MESSAGES: Record<AppErrorCode, string> = {
   invalid_response: 'The translation came back in an unexpected form. Please try again.',
   unsupported_language: 'This language pair is not available yet. Try a different pair.',
   model_missing: 'That language pack is not downloaded yet.',
+  entitlement_required: 'That is part of Transee Pro.',
   storage_error: 'Something went wrong saving to this device.',
   cancelled: 'That was cancelled.',
   unknown: 'Something went wrong. Please try again.',

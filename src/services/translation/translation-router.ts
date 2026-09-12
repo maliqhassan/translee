@@ -25,6 +25,11 @@ export type TranslationRouterOptions = {
    * on the very next request without rebuilding the router.
    */
   mode?: () => TranslationMode;
+  /**
+   * Whether the on-device engine may run, read lazily for the same reason the
+   * mode is. Omitted means permitted.
+   */
+  offlineEntitled?: () => boolean;
 };
 
 /**
@@ -57,6 +62,9 @@ export function createTranslationRouter(options: TranslationRouterOptions): Tran
     const ordered = orderEngines(engines, {
       network: networkStatus,
       mode: options.mode?.() ?? 'auto',
+      // Passed through rather than resolved here, so the policy stays the one
+      // place an engine is ruled in or out.
+      offlineEntitled: options.offlineEntitled,
     });
 
     let anyAvailable = false;
@@ -80,6 +88,18 @@ export function createTranslationRouter(options: TranslationRouterOptions): Tran
     anyAvailable: boolean,
   ) {
     const mode = options.mode?.() ?? 'auto';
+    const offlineEntitled = options.offlineEntitled?.() ?? true;
+
+    /*
+     * Checked before the missing-pack message below, which would otherwise be
+     * a lie: telling someone to download a pack they are not allowed to use
+     * sends them to a screen that cannot help them. The mode itself is left
+     * alone — a lapsed subscriber's stored preference is theirs to keep, and
+     * rewriting it would lose their choice if they resubscribe.
+     */
+    if (mode === 'offline' && !offlineEntitled) {
+      return appError('entitlement_required', 'On-device translation is part of Transee Pro.');
+    }
 
     // The user restricted routing themselves; say so plainly rather than
     // reporting a generic failure or quietly using the other engine.

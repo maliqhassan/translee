@@ -19,6 +19,14 @@ export type AppErrorCode =
   | 'invalid_response'
   | 'unsupported_language'
   | 'model_missing'
+  /**
+   * The user's plan does not include what was asked for.
+   *
+   * Distinct from `permission_denied`, which is about an operating system
+   * permission the user can grant, and from `service_unavailable`, which
+   * invites a retry that would never succeed.
+   */
+  | 'entitlement_required'
   | 'storage_error'
   | 'cancelled'
   | 'unknown';

@@ -57,6 +57,23 @@ export const FEATURES = {
    */
   offlineTranslation: true,
   /**
+   * Whether the `offlineTranslation` entitlement is actually *enforced*.
+   *
+   * Off, and the routing layer behaves exactly as it always has: the on-device
+   * engine is a candidate for everyone, on any plan. On, and it is a candidate
+   * only for a user entitled to it.
+   *
+   * Deliberately separate from `offlineTranslation` above, which says whether
+   * the capability exists in this build at all. The two are different
+   * questions and this one cannot be answered yet: no translation backend is
+   * deployed, so the on-device engine is currently the only path that works.
+   * Enforcing today would leave free users unable to translate anything.
+   *
+   * Turn this on only once online translation is deployed and verified on a
+   * device. Until then the enforcement is implemented, tested and dormant.
+   */
+  offlineEntitlement: false,
+  /**
    * Scanning text with the camera, over ML Kit's bundled Latin recogniser.
    * Implemented end to end and compiles; no device has pointed a camera at
    * anything yet. Latin script only.

@@ -14,6 +14,14 @@ export type CachingRouterOptions = {
   cache: TranslationCache;
   /** Collapses concurrent identical requests onto one call. */
   inFlight?: InFlightRegistry;
+  /**
+   * Whether an on-device result may still be handed back.
+   *
+   * The cache sits above the router, so a hit never reaches the routing policy
+   * and would otherwise keep serving an on-device translation long after the
+   * plan that earned it lapsed. Omitted means permitted.
+   */
+  offlineEntitled?: () => boolean;
 };
 
 /**
@@ -33,6 +41,17 @@ export function withCache(
 ): TranslationRouter {
   const { cache, inFlight } = options;
 
+  /**
+   * Whether a stored result is still the user's to receive.
+   *
+   * Only on-device results can go stale this way, and only by entitlement —
+   * so nothing else is re-examined, and a refused entry is left in place
+   * rather than evicted. Someone who resubscribes gets their cache back, and
+   * the online entries sitting beside it were never in question.
+   */
+  const mayServe = (result: TranslationResult): boolean =>
+    result.engine !== 'offline' || (options.offlineEntitled?.() ?? true);
+
   return {
     async translate(request: TranslationRequest): ServiceResult<TranslationResult> {
       const normalized = normalizeTranslationRequest(request);
@@ -40,7 +59,7 @@ export function withCache(
       if (!normalized.ok) return router.translate(request);
 
       const cached = await cache.get(normalized.value);
-      if (cached) {
+      if (cached && mayServe(cached)) {
         log.debug('cache hit');
         return ok(cached);
       }
@@ -52,6 +71,18 @@ export function withCache(
         return result;
       };
 
+      /*
+       * Known and accepted: a request that joins one already in flight
+       * receives its result directly, without passing `mayServe`. So a second
+       * request for identical text, made in the moment between an on-device
+       * translation starting and settling, can still be served across a
+       * simultaneous loss of entitlement.
+       *
+       * Left alone deliberately. Closing it means either refusing to share
+       * in-flight work or re-translating the joiner's request, and neither is
+       * worth it for a window this narrow: the entitlement would have to lapse
+       * during a single translation, and the next request is gated normally.
+       */
       return inFlight ? inFlight.run(key, run) : run();
     },
 

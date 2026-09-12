@@ -27,6 +27,7 @@ import {
   createOnlineTranslationService,
   createTranslationRouter,
   mockTranslationService,
+  offlineTranslationPermitted,
   unconfiguredOnlineTranslationService,
   withCache,
   type TranslationService,
@@ -107,14 +108,29 @@ const translationCache = TRANSLATION_CONFIG.cache.enabled
   ? createMemoryTranslationCache({ maxEntries: TRANSLATION_CONFIG.cache.maxEntries })
   : createNullTranslationCache();
 
+/**
+ * The same entitlement question asked in both places it can be bypassed.
+ *
+ * The routing policy decides whether the on-device engine may run; the cache
+ * decides whether a result it already produced may still be handed back. One
+ * helper answers both, so the two can never disagree — and neither is a
+ * filter over `translationEngines` above, which stays whole. Filtering the
+ * candidate list here would freeze the answer at import time, which is exactly
+ * the stale state a lapsed subscription would exploit.
+ */
 const translationRouter = withCache(
   createTranslationRouter({
     engines: translationEngines,
     network: expoNetworkService,
     // Read per request, so changing the setting takes effect immediately.
     mode: getActiveTranslationMode,
+    offlineEntitled: offlineTranslationPermitted,
   }),
-  { cache: translationCache, inFlight: createInFlightRegistry() },
+  {
+    cache: translationCache,
+    inFlight: createInFlightRegistry(),
+    offlineEntitled: offlineTranslationPermitted,
+  },
 );
 
 /**

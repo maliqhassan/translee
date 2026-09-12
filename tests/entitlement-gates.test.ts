@@ -546,12 +546,21 @@ describe('nothing else was gated', () => {
     }
   });
 
-  it('leaves translation routing untouched by entitlements', () => {
-    const offenders = sources('src/services/translation').filter((path) =>
-      decidesEntitlement(code(path)),
-    );
+  it('confines the routing entitlement to the policy, router, cache and helper', () => {
+    // Through Step 2B this asserted that routing knew nothing about
+    // entitlements at all. Step 2C makes that false on purpose, so the rule
+    // becomes *where* rather than *whether*: the engine gate reaches exactly
+    // four files and no engine, provider or adapter below them.
+    const offenders = sources('src/services/translation')
+      .filter((path) => decidesEntitlement(code(path)) || code(path).includes('offlineEntitled'))
+      .sort();
 
-    assert.deepEqual(offenders, [], 'routing is a later product decision');
+    assert.deepEqual(offenders, [
+      'src/services/translation/caching-router.ts',
+      'src/services/translation/offline-entitlement.ts',
+      'src/services/translation/routing-policy.ts',
+      'src/services/translation/translation-router.ts',
+    ]);
   });
 
   it('still admits both real engines exactly as before', () => {
@@ -561,5 +570,89 @@ describe('nothing else was gated', () => {
 
     assert.match(registry, /const translationEngines: readonly TranslationService\[\] = \[/);
     assert.match(registry, /onlineTranslationService,\s*offlineEngine,/);
+  });
+});
+
+describe('the offline engine gate lives below the UI', () => {
+  it('is decided in the routing and cache layer, never by a screen', () => {
+    // A component that could decide whether an engine may run would be a
+    // second gate, and the one a user could get around by reaching the router
+    // another way.
+    const offenders = [...sources('src/features'), ...sources('src/components')].filter((path) =>
+      /offlineEntitled|offlineTranslationPermitted|orderEngines/.test(code(path)),
+    );
+
+    assert.deepEqual(offenders, []);
+  });
+
+  it('leaves feature code choosing no engine at all', () => {
+    // Everything above the services layer still reaches translation through
+    // the router, exactly as before this step.
+    const offenders = sources('src/features').filter((path) =>
+      /services\.translation\.(offline|online)\b/.test(code(path)),
+    );
+
+    assert.deepEqual(offenders, []);
+  });
+
+  it('reads the plan only through the non-React bridge', () => {
+    const helper = code('src/services/translation/offline-entitlement.ts');
+
+    // Not a hook, not the store, not a copy of the plan table: the registry
+    // and router are singletons built at import time and cannot use React.
+    assert.match(helper, /hasActiveCapability/);
+    assert.equal(helper.includes('useEntitlements'), false);
+    assert.equal(helper.includes('PLAN_CAPABILITIES'), false);
+    assert.equal(helper.includes('resolveFeatureAccess'), false);
+  });
+
+  it('keeps that helper the only thing combining the flag with the capability', () => {
+    // Two copies of this rule would eventually disagree, and the disagreement
+    // would be a free upgrade.
+    const offenders = sources('src')
+      .filter((path) => path !== 'src/services/translation/offline-entitlement.ts')
+      .filter((path) => code(path).includes('FEATURES.offlineEntitlement'));
+
+    assert.deepEqual(offenders, []);
+  });
+
+  it('asks the entitlement through a getter, so it cannot be captured', () => {
+    const policy = read('src/services/translation/routing-policy.ts');
+    const router = read('src/services/translation/translation-router.ts');
+    const cache = read('src/services/translation/caching-router.ts');
+
+    for (const [name, source] of [
+      ['policy', policy],
+      ['router', router],
+      ['cache', cache],
+    ] as const) {
+      assert.match(source, /offlineEntitled\?: \(\) => boolean/, name);
+    }
+  });
+
+  it('gates before the engine is asked anything about itself', () => {
+    const policy = code('src/services/translation/routing-policy.ts');
+
+    // The ordering inside isEligible is the gate. Availability and pair
+    // support are the engine's own answers and must never be reached.
+    assert.match(policy, /if \(engine === 'offline' && !offlineEntitled\) return false;/);
+    assert.equal(policy.includes('isAvailable'), false);
+    assert.equal(policy.includes('supportsPair'), false);
+  });
+
+  it('tells a locked-out user what is actually wrong', () => {
+    const router = read('src/services/translation/translation-router.ts');
+
+    // "no language pack is installed yet" would send them somewhere that
+    // cannot help, so the entitlement is reported first.
+    assert.match(
+      router,
+      /if \(mode === 'offline' && !offlineEntitled\) \{\s*return appError\('entitlement_required'/,
+    );
+  });
+
+  it('gives that error its own code and its own copy', () => {
+    assert.match(read('src/types/common.ts'), /\| 'entitlement_required'/);
+    assert.match(read('src/constants/messages.ts'), /entitlement_required: '[^']+'/);
   });
 });
