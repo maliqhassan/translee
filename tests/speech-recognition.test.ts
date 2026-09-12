@@ -3,6 +3,13 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
 import {
+  CAPABILITIES,
+  capabilitiesFor,
+  resolveFeatureAccess,
+  type Capability,
+  type Plan,
+} from '@/services/entitlements';
+import {
   createExpoSpeechRecognitionService,
   supportsOnDeviceRecognition,
   type SpeechRecognitionNative,
@@ -495,5 +502,61 @@ describe('the microphone is wired, not decorative', () => {
   it('is gated on the shipped-capability flag', () => {
     const hook = readFileSync('src/features/translation/hooks/use-speech-recognition.ts', 'utf8');
     assert.match(hook, /FEATURES\.speechInput/);
+  });
+});
+
+describe('dictation is a Pro capability', () => {
+  /**
+   * The decision itself is `resolveFeatureAccess`, which is unit-tested
+   * exhaustively in `entitlements.test.ts`. What is worth pinning here is that
+   * the speech gate feeds it the right three answers, and that every case the
+   * product cares about comes out of it.
+   */
+  const accessFor = (shipped: boolean, supported: boolean, plan: Plan) =>
+    resolveFeatureAccess({
+      shipped,
+      supported,
+      entitled: capabilitiesFor(plan).has('speechRecognition'),
+    });
+
+  it('is locked for a free user on a device that could listen', () => {
+    assert.equal(accessFor(true, true, 'free'), 'locked');
+  });
+
+  it('is allowed for a pro user on a device that could listen', () => {
+    assert.equal(accessFor(true, true, 'pro'), 'allowed');
+  });
+
+  it('is unavailable when the capability is not in this build, on either plan', () => {
+    assert.equal(accessFor(false, true, 'free'), 'unavailable');
+    assert.equal(accessFor(false, true, 'pro'), 'unavailable');
+  });
+
+  it('is unavailable when the device has no recogniser, on either plan', () => {
+    assert.equal(accessFor(true, false, 'free'), 'unavailable');
+    assert.equal(accessFor(true, false, 'pro'), 'unavailable');
+  });
+
+  it('never reports locked for a device that could not listen anyway', () => {
+    // `locked` is what leads to the paywall. A phone with no recogniser must
+    // never reach it, because upgrading would not give it one.
+    for (const plan of ['free', 'pro'] as const) {
+      assert.notEqual(accessFor(true, false, plan), 'locked');
+      assert.notEqual(accessFor(false, false, plan), 'locked');
+      assert.notEqual(accessFor(false, true, plan), 'locked');
+    }
+  });
+
+  it('is part of the Pro plan and not the free one', () => {
+    assert.equal(capabilitiesFor('pro').has('speechRecognition'), true);
+    assert.equal(capabilitiesFor('free').has('speechRecognition'), false);
+  });
+
+  it('is sold under a name of its own, separate from the build flag', () => {
+    // `FEATURES.speechInput` says what is in the build; `speechRecognition`
+    // says what the user paid for. Conflating them would make a flag change
+    // look like a purchase.
+    assert.equal(CAPABILITIES.includes('speechRecognition'), true);
+    assert.equal(CAPABILITIES.includes('speechInput' as Capability), false);
   });
 });

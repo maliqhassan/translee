@@ -18,6 +18,7 @@ import { CAPABILITIES, PLAN_CAPABILITIES } from '@/services/entitlements';
 const read = (path: string) => readFileSync(path, 'utf8');
 
 const HOOK = 'src/features/translation/hooks/use-camera-ocr.ts';
+const SPEECH_HOOK = 'src/features/translation/hooks/use-speech-recognition.ts';
 const COMPOSER = 'src/features/translation/components/translation-composer.tsx';
 const CAMERA_SCREEN = 'src/features/camera/screens/camera-screen.tsx';
 const SETTINGS = 'src/features/settings/screens/settings-screen.tsx';
@@ -294,6 +295,136 @@ describe('the development switcher cannot ship', () => {
   });
 });
 
+describe('the speech recognition decision lives in the controller', () => {
+  it('is the hook that reads the entitlement', () => {
+    const hook = read(SPEECH_HOOK);
+
+    assert.match(hook, /useEntitlements/);
+    assert.match(hook, /has\('speechRecognition'\)/);
+  });
+
+  it('resolves it through the same shared rule the camera uses', () => {
+    const hook = read(SPEECH_HOOK);
+
+    // Not a second copy of the ordering. If the rule ever changes, it changes
+    // for both gates at once.
+    assert.match(hook, /resolveFeatureAccess/);
+    assert.match(hook, /shipped: FEATURES\.speechInput/);
+    assert.match(hook, /supported,/);
+    assert.match(hook, /entitled: has\('speechRecognition'\)/);
+  });
+
+  it('keeps the build flag as the first question', () => {
+    // The device is asked only when the capability shipped, so a build
+    // without it never probes the recogniser at all.
+    assert.match(
+      read(SPEECH_HOOK),
+      /if \(FEATURES\.speechInput\) \{[\s\S]*services\.speech\.isAvailable\(\)/,
+    );
+  });
+
+  it('offers nothing at all until both answers are in', () => {
+    assert.match(read(SPEECH_HOOK), /supported === undefined \|\| !loaded\s*\?\s*'unavailable'/);
+  });
+
+  it('publishes locked as a status of its own', () => {
+    const hook = read(SPEECH_HOOK);
+
+    assert.match(hook, /\| 'locked'/);
+    assert.match(hook, /status: SpeechStatus/);
+  });
+
+  it('keeps the flow states out of the gate states', () => {
+    // `locked` and `unavailable` are decided by the gate; everything else is
+    // the session's own business. The type says so rather than a comment.
+    assert.match(
+      read(SPEECH_HOOK),
+      /type SpeechFlow = Exclude<SpeechStatus, 'unavailable' \| 'locked'>/,
+    );
+  });
+});
+
+describe('a free user cannot reach the microphone', () => {
+  it('refuses to start or stop a session', () => {
+    assert.match(read(SPEECH_HOOK), /\(language: LanguageCode\) => \{\s*if \(!allowed\) return;/);
+  });
+
+  it('re-checks after the permission dialog, which the plan can outlive', () => {
+    // Awaiting a permission prompt is the one place a plan can change between
+    // the tap and the microphone actually opening.
+    assert.match(
+      read(SPEECH_HOOK),
+      /if \(!allowedNow\.current\) \{\s*busy\.current = false;\s*return;\s*\}\s*const started = await services\.speech\.start/,
+    );
+  });
+
+  it('refuses to deliver a transcript, whatever produced it', () => {
+    const hook = read(SPEECH_HOOK);
+
+    // Both transcript events are guarded, so a session that outlived a plan
+    // change cannot write into the draft.
+    const guards = hook.match(/if \(!allowedNow\.current\) return;/g) ?? [];
+    assert.equal(guards.length, 2, 'both partial and final are guarded');
+  });
+
+  it('closes the microphone when the entitlement goes away', () => {
+    // The status would read locked either way; an open microphone behind a
+    // lock is a privacy problem rather than a cosmetic one.
+    assert.match(
+      read(SPEECH_HOOK),
+      /if \(allowed \|\| !busy\.current\) return;[\s\S]{0,200}services\.speech\.cancel\(\)/,
+    );
+  });
+
+  it('reaches the recogniser only through the service, as before', () => {
+    const hook = read(SPEECH_HOOK);
+
+    assert.match(hook, /services\.speech\.start/);
+    assert.equal(hook.includes('expo-speech-recognition'), false);
+  });
+
+  it('leaves the speech implementation itself untouched by entitlements', () => {
+    const offenders = sources('src/services/speech').filter((path) =>
+      decidesEntitlement(code(path)),
+    );
+
+    assert.deepEqual(offenders, [], 'recognising speech is not where plans belong');
+  });
+});
+
+describe('an unsupported device is never sold dictation', () => {
+  it('refuses to open the paywall unless the feature is locked', () => {
+    assert.match(
+      read(SPEECH_HOOK),
+      /if \(access !== 'locked'\) return;\s*router\.push\('\/upgrade'\)/,
+    );
+  });
+
+  it('hides the microphone entirely when it is unavailable', () => {
+    const composer = read(COMPOSER);
+
+    assert.match(composer, /canSpeak = speech && speech\.status !== 'unavailable'/);
+    assert.match(composer, /\{canSpeak \?/);
+  });
+
+  it('leads a locked Speak button to the paywall rather than the microphone', () => {
+    const composer = read(COMPOSER);
+
+    assert.match(composer, /icon="lock-closed-outline"[\s\S]{0,200}onPress=\{speech\.upgrade\}/);
+    assert.match(
+      composer,
+      /speech\.listening \? 'stop-circle' : 'mic-outline'[\s\S]{0,200}onPress=\{\(\) => speech\.toggle\(sourceLanguage\)\}/,
+    );
+  });
+
+  it('keeps the composer reacting to the controller, never to a plan', () => {
+    // The same rule the camera gate follows: the component reads a status and
+    // makes no commercial judgement of its own.
+    assert.match(read(COMPOSER), /speech\?\.status === 'locked'/);
+    assert.equal(decidesEntitlement(code(COMPOSER)), false);
+  });
+});
+
 describe('the entitlement system is wired in', () => {
   it('is bound in the registry over the existing storage seam', () => {
     const registry = read(REGISTRY);
@@ -398,12 +529,8 @@ describe('the paywall is a placeholder and says so', () => {
 });
 
 describe('nothing else was gated', () => {
-  it('leaves speech recognition ungated', () => {
-    assert.equal(
-      decidesEntitlement(code('src/features/translation/hooks/use-speech-recognition.ts')),
-      false,
-    );
-  });
+  // Speech recognition was ungated through Step 2A and is gated as of Step 2B;
+  // its rules live in their own block above.
 
   it('leaves text-to-speech ungated', () => {
     assert.equal(decidesEntitlement(code('src/features/translation/hooks/use-speak.ts')), false);

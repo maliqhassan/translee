@@ -24,7 +24,9 @@ export type TranslationComposerProps = {
   placeholder?: string;
   /**
    * Dictation. Omitted, or reporting itself unavailable, hides the microphone
-   * entirely rather than showing a control that cannot work.
+   * entirely rather than showing a control that cannot work. Reporting itself
+   * locked shows the same action wearing a lock, which leads to the upgrade
+   * screen.
    */
   speech?: SpeechController;
   /**
@@ -77,6 +79,7 @@ export function TranslationComposer({
   const canScan = scan && scan.status !== 'unavailable';
   const scanLocked = scan?.status === 'locked';
   const canSpeak = speech && speech.status !== 'unavailable';
+  const speechLocked = speech?.status === 'locked';
 
   return (
     <Card variant="outlined" padding="md" style={{ gap: theme.spacing.xs }}>
@@ -145,15 +148,27 @@ export function TranslationComposer({
         ) : null}
 
         {canSpeak ? (
-          <Button
-            label={speech.listening ? 'Stop' : 'Speak'}
-            icon={speech.listening ? 'stop-circle' : 'mic-outline'}
-            variant={speech.listening ? 'primary' : 'secondary'}
-            size="sm"
-            onPress={() => speech.toggle(sourceLanguage)}
-            accessibilityHint="Dictates in the source language"
-            style={{ paddingHorizontal: theme.spacing.md }}
-          />
+          speechLocked ? (
+            <Button
+              label="Speak"
+              icon="lock-closed-outline"
+              variant="ghost"
+              size="sm"
+              onPress={speech.upgrade}
+              accessibilityHint="Speech-to-text is part of Transee Pro"
+              style={{ paddingHorizontal: theme.spacing.md }}
+            />
+          ) : (
+            <Button
+              label={speech.listening ? 'Stop' : 'Speak'}
+              icon={speech.listening ? 'stop-circle' : 'mic-outline'}
+              variant={speech.listening ? 'primary' : 'secondary'}
+              size="sm"
+              onPress={() => speech.toggle(sourceLanguage)}
+              accessibilityHint="Dictates in the source language"
+              style={{ paddingHorizontal: theme.spacing.md }}
+            />
+          )
         ) : null}
 
         <Button
