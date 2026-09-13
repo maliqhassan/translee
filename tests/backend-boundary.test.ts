@@ -116,3 +116,68 @@ describe('the backend keeps its own secret out of the repository', () => {
     assert.match(ignored, /^!\.env\.example$/m);
   });
 });
+
+describe('build profiles carry configuration, never values', () => {
+  const eas = () => JSON.parse(readFileSync('eas.json', 'utf8')) as Record<string, unknown>;
+
+  const profiles = () => {
+    const build = eas().build as Record<string, Record<string, unknown>>;
+    return build;
+  };
+
+  it('names an environment for each profile, so EAS supplies the URL', () => {
+    // The app reads the URL from the bundle, and only EAS can put it there for
+    // a cloud build — a local .env never reaches an EAS worker.
+    for (const name of ['preview', 'production']) {
+      assert.equal(typeof profiles()[name]?.environment, 'string', `${name} names no environment`);
+    }
+  });
+
+  it('keeps preview and production independently configurable', () => {
+    // Otherwise a staging backend could be baked into a store build.
+    assert.notEqual(profiles().preview?.environment, profiles().production?.environment);
+  });
+
+  it('contains no backend URL of any kind', () => {
+    // The deployment address belongs to the EAS environment, not to git. A URL
+    // committed here would also make every host change a repository change.
+    const serialised = readFileSync('eas.json', 'utf8');
+
+    assert.equal(/https?:\/\//.test(serialised), false, 'no URL may be committed here');
+  });
+
+  it('carries nothing credential-shaped', () => {
+    // A build profile is the one place someone might reasonably think an
+    // Azure key belongs. It does not: the key is the backend's alone.
+    const serialised = readFileSync('eas.json', 'utf8').toLowerCase();
+
+    for (const forbidden of [
+      'key',
+      'secret',
+      'token',
+      'password',
+      'authorization',
+      'azure',
+      'cognitive',
+      'subscription',
+    ]) {
+      assert.equal(serialised.includes(forbidden), false, forbidden);
+    }
+  });
+
+  it('declares no inline env block, so no value can be committed by accident', () => {
+    for (const name of ['preview', 'production']) {
+      assert.equal(profiles()[name]?.env, undefined, `${name} must take values from EAS`);
+    }
+  });
+
+  it('says in the README how the URL actually reaches a build', () => {
+    const readme = readFileSync('README.md', 'utf8');
+
+    assert.match(readme, /eas env:create/);
+    assert.match(readme, /EXPO_PUBLIC_TRANSEE_API_URL/);
+    // The trap worth documenting: a secret-typed variable is withheld from the
+    // bundler, producing a build with no backend and no error.
+    assert.match(readme, /plaintext/i);
+  });
+});

@@ -50,6 +50,37 @@ cd server && TRANSLATION_PROVIDER=fake npm start
 backend URL belongs there — never a provider key. See
 [server/README.md](server/README.md).
 
+### Backend URL for EAS builds
+
+EAS builds run on EAS's machines and never see a local `.env`. Each build
+profile in [eas.json](eas.json) names the EAS environment it takes variables
+from — `preview` and `production`, so the two are configured independently and
+a staging backend can never be baked into a store build.
+
+The URL itself is not in this repository. Set it once per environment after the
+backend is deployed:
+
+```bash
+eas env:create --scope project --name EXPO_PUBLIC_TRANSEE_API_URL \
+  --value "https://<your-backend-host>" --environment preview --visibility plaintext
+```
+
+Repeat with `--environment production`. Check what a profile will build with
+using `eas env:list --environment preview`.
+
+**Plaintext, not secret.** EAS withholds secret-typed variables from the
+bundler, so marking this one secret would silently produce a build with no
+backend — and it is public by design anyway. Nothing secret may ever be an
+`EXPO_PUBLIC_*` variable.
+
+The value is inlined at build time, so **changing the backend URL needs a new
+build**. Prefer a domain you control over a hosting provider's default
+hostname; moving hosts later then costs a DNS change rather than shipping a new
+binary to every user.
+
+With no variable set the build is simply unconfigured: the online engine
+reports itself unavailable and no request is attempted.
+
 ## Scripts
 
 | Command             | Purpose                                |
